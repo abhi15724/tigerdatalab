@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tigerdatalab"
+version = "3.0.4"
+description = "Automated Data Analytics + Data Quality + Visualization + BI + DataOps platform, built on pandas/numpy/duckdb/plotly."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "Abhi" }]
+keywords = ["data-analysis", "business-intelligence", "eda", "dataops", "dashboard", "pandas", "duckdb", "plotly"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+dependencies = [
+    "pandas>=1.5",
+    "numpy>=1.23",
+    "openpyxl>=3.1",
+    "plotly>=5.18",
+    "charset-normalizer>=3.0",
+]
+
+[project.optional-dependencies]
+large = ["duckdb>=0.10", "pyarrow>=14.0"]
+pdf = ["reportlab>=4.0"]
+all = ["duckdb>=0.10", "pyarrow>=14.0", "reportlab>=4.0"]
+dev = ["pytest>=7.4", "pytest-cov>=4.1"]
+
+[project.urls]
+Homepage = "https://github.com/example/tigerdatalab"
+Repository = "https://github.com/example/tigerdatalab"
+
+[project.scripts]
+tigerdatalab = "tigerdatalab.cli.main:main"
+
+[tool.setuptools.packages.find]
+include = ["tigerdatalab*"]

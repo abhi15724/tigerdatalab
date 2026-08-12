@@ -1,0 +1,8 @@
+order_id,order_date,category,revenue,is_active
+1.0,2024-01-01, Electronics ,100,True
+2.0,01/02/2024,Grocery,200.5,False
+2.0,not-a-date,Electronics,,True
+3.0,2024-01-04,,abc,True
+4.0,,Apparel,150,False
+,2024-01-06,Apparel,-50,
+6.0,2024/01/07,Grocery,300,True
