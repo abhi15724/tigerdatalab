@@ -37,8 +37,8 @@ all = ["duckdb>=0.10", "pyarrow>=14.0", "reportlab>=4.0"]
 dev = ["pytest>=7.4", "pytest-cov>=4.1"]
 
 [project.urls]
-Homepage = "https://github.com/example/tigerdatalab"
-Repository = "https://github.com/example/tigerdatalab"
+Homepage = "https://github.com/abhi15724/tigerdatalab"
+Repository = "https://github.com/abhi15724/tigerdatalab"
 
 [project.scripts]
 tigerdatalab = "tigerdatalab.cli.main:main"
