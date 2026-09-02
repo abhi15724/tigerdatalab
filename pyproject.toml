@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tigerdatalab"
-version = "4.0.0"
+version = "4.1.0"
 description = "Unified production-oriented data analytics, data science, data engineering, AI training and company AI platform."
 readme = "README.md"
 license = { text = "MIT" }
