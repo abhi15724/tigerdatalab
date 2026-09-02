@@ -6,6 +6,7 @@
     tigerdatalab quality sales.csv
     tigerdatalab clean sales.csv
     tigerdatalab report sales.csv
+    tigerdatalab ai-prepare data.csv --task sft --output ai_dataset
 """
 from __future__ import annotations
 
@@ -41,6 +42,14 @@ def main(argv: list[str] | None = None) -> int:
     p_report.add_argument("path")
     p_report.add_argument("-o", "--output", default="analysis")
 
+    p_ai = sub.add_parser("ai-prepare", help="Prepare privacy-aware AI training data")
+    p_ai.add_argument("path")
+    p_ai.add_argument("--task", choices=["sft", "instruction", "dpo", "classification", "text"], default="sft")
+    p_ai.add_argument("-o", "--output", default="ai_dataset")
+    p_ai.add_argument("--split-strategy", choices=["hash", "positional"], default="hash")
+    p_ai.add_argument("--train-ratio", type=float, default=.8)
+    p_ai.add_argument("--validation-ratio", type=float, default=.1)
+
     args = parser.parse_args(argv)
 
     try:
@@ -67,8 +76,14 @@ def main(argv: list[str] | None = None) -> int:
             print("\nGenerated files:")
             for k, v in outputs.items():
                 print(f"  {k}: {v}")
+        elif args.command == "ai-prepare":
+            from ..ai import prepare
+            dataset = prepare(args.path, args.task).run()
+            out = dataset.export(args.output, args.train_ratio, args.validation_ratio, args.split_strategy)
+            print(f"AI dataset written to: {out}")
+            print(f"Records: {len(dataset.prepared)} | Quality: {dataset.quality()['overall']}")
         return 0
-    except TigerDataLabError as e:
+    except (TigerDataLabError, ValueError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
