@@ -1,7 +1,8 @@
 """Tests for the provider-independent AI platform layer."""
 from tigerdatalab.ai import (
-    AIResponse, Asset, CompanyAI, Document, Evaluator, KnowledgeBase, ModelRouter,
-    Provider, Registry, Tool, ToolRegistry, Workflow, WorkflowStep, chunk_text,
+    AIResponse, Asset, CallableTrainingBackend, CompanyAI, Document, Evaluator,
+    KnowledgeBase, ModelRouter, Provider, Registry, Tool, ToolRegistry, UniversalTrainer,
+    Workflow, WorkflowStep, TrainingRequest, chunk_text,
 )
 
 
@@ -64,3 +65,33 @@ def test_company_ai_uses_router():
     router = ModelRouter().add(FakeProvider("hello"), "fake-model")
     result = CompanyAI(router).ask("hello")
     assert result.output == "hello" and result.model == "fake-model"
+
+
+def test_universal_trainer_accepts_custom_model_backend():
+    seen = {}
+
+    def custom_train(request: TrainingRequest):
+        seen["model"] = request.model
+        seen["task"] = request.task
+        seen["dataset"] = request.dataset
+        return "trained"
+
+    backend = CallableTrainingBackend(custom_train, name="vendor-x")
+    result = UniversalTrainer("vendor-model", backend=backend).train_sft([{"text": "hello"}])
+    assert result == "trained"
+    assert seen == {"model": "vendor-model", "task": "sft", "dataset": [{"text": "hello"}]}
+
+
+def test_universal_trainer_options_are_forwarded():
+    captured = {}
+
+    def custom_train(request: TrainingRequest):
+        captured.update(request.options)
+        return request.output_dir
+
+    backend = CallableTrainingBackend(custom_train)
+    result = UniversalTrainer("model", "/tmp/output", backend=backend).train_sft(
+        [], quantization="4bit", peft=True
+    )
+    assert result == "/tmp/output"
+    assert captured == {"quantization": "4bit", "peft": True}
