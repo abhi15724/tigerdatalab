@@ -74,20 +74,28 @@ TigerDataLab connects the complete journey from **business data → trusted data
 ## 📦 Installation
 
 ```bash
+python -m pip install tigerdatalab==4.0.0
+```
+
+Or install the latest PyPI release:
+
+```bash
 python -m pip install tigerdatalab
 ```
 
 AI training extras:
 
 ```bash
-python -m pip install "tigerdatalab[train]"
+python -m pip install "tigerdatalab[train]==4.0.0"
 ```
 
 Full optional capabilities:
 
 ```bash
-python -m pip install "tigerdatalab[all]"
+python -m pip install "tigerdatalab[all]==4.0.0"
 ```
+
+> **Release:** TigerDataLab **v4.0.0** is the current development release for the unified Data + AI platform. The PyPI version badge above always reflects the version currently published on PyPI.
 
 ---
 
