@@ -50,6 +50,11 @@ _ADAPTERS = {
 }
 
 
+def _record_key(record: Mapping[str, Any]) -> str:
+    """Canonical key matching the deterministic deduplication representation."""
+    return json.dumps(dict(record), ensure_ascii=False, sort_keys=True, default=str, separators=(",", ":"))
+
+
 class AIDataset:
     """Prepare a source dataset for LLM/ML training while retaining audit lineage."""
 
@@ -65,8 +70,8 @@ class AIDataset:
         if self.task not in _ADAPTERS:
             raise ValueError("Supported tasks: sft, instruction, dpo, classification, text")
         records: list[dict[str, Any]] = []
+        pii_by_record: dict[str, dict[str, int]] = {}
         rejected = 0
-        pii: dict[str, int] = {}
         too_short = too_long = 0
         adapter = _ADAPTERS[self.task]
         for row in self.rows:
@@ -74,9 +79,6 @@ class AIDataset:
             # accounting independent of the selected training adapter and
             # correctly handles nested chat records as well as flat rows.
             safe_row, found = mask_record(row)
-            for kind, count in found.items():
-                pii[kind] = pii.get(kind, 0) + count
-
             item = adapter(safe_row)
             if not item:
                 rejected += 1
@@ -89,10 +91,16 @@ class AIDataset:
                 too_long += 1
                 continue
             records.append(item)
+            # Keep one PII count per canonical retained example so duplicate
+            # source rows do not inflate the reported masking statistics.
+            pii_by_record.setdefault(_record_key(item), dict(found))
 
-        # Deduplicate after canonical format conversion. PII counts reflect the
-        # retained source examples, not repeated copies of the same example.
         records, duplicates = deduplicate(records)
+        pii: dict[str, int] = {}
+        for record in records:
+            for kind, count in pii_by_record.get(_record_key(record), {}).items():
+                pii[kind] = pii.get(kind, 0) + count
+
         self.validation = validate_records(records, self.task)
         invalid = {issue.index for issue in self.validation.issues}
         if invalid:
