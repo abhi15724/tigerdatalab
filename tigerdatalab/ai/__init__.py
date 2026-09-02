@@ -4,7 +4,20 @@ from .dedup import deduplicate, fingerprint
 from .evaluation import EvaluationResult, Evaluator, evaluate
 from .pipeline import AIDataset, prepare
 from .privacy import PIIFinding, PIIScanner, mask_record
-from .providers import AIResponse, OpenAIProvider, Provider, ProviderError, get_provider
+from .providers import (
+    AIResponse,
+    AnthropicProvider,
+    GeminiProvider,
+    GroqProvider,
+    MistralProvider,
+    OpenAICompatibleProvider,
+    OpenAIProvider,
+    OpenRouterProvider,
+    Provider,
+    ProviderError,
+    TogetherProvider,
+    get_provider,
+)
 from .quality import label_distribution, quality_metrics
 from .rag import Chunk, Document, KnowledgeBase, chunk_text
 from .registry import Asset, Registry
@@ -36,8 +49,10 @@ __all__ = [
     "deterministic_split_records", "deduplicate", "fingerprint", "ValidationIssue",
     "ValidationReport", "validate_record", "validate_records", "quality_metrics",
     "label_distribution", "Provider", "ProviderError", "AIResponse", "OpenAIProvider",
-    "get_provider", "Document", "Chunk", "KnowledgeBase", "chunk_text", "EvaluationResult",
-    "Evaluator", "evaluate", "Tool", "ToolError", "ToolRegistry", "tool", "Workflow",
-    "WorkflowError", "WorkflowResult", "WorkflowStep", "step", "ModelRouter", "ModelTarget",
-    "RoutingError", "router_from_config", "Asset", "Registry", "CompanyAI", "AIResult",
+    "OpenAICompatibleProvider", "AnthropicProvider", "GeminiProvider", "GroqProvider",
+    "OpenRouterProvider", "MistralProvider", "TogetherProvider", "get_provider", "Document",
+    "Chunk", "KnowledgeBase", "chunk_text", "EvaluationResult", "Evaluator", "evaluate",
+    "Tool", "ToolError", "ToolRegistry", "tool", "Workflow", "WorkflowError", "WorkflowResult",
+    "WorkflowStep", "step", "ModelRouter", "ModelTarget", "RoutingError", "router_from_config",
+    "Asset", "Registry", "CompanyAI", "AIResult",
 ]
