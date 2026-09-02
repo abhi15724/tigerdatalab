@@ -20,12 +20,7 @@ class AIResult:
 
 
 class CompanyAI:
-    """Production composition root for a company-specific AI application.
-
-    TigerDataLab does not train proprietary hosted models itself; it prepares
-    data, retrieval context, tools and evaluation around the model a customer chooses.
-    """
-
+    """Composition root for a company-specific AI application."""
     def __init__(self, router: ModelRouter, *, knowledge_base: KnowledgeBase | None = None,
                  tools: ToolRegistry | None = None, workflow: Workflow | None = None,
                  evaluator: Evaluator | None = None):
@@ -39,14 +34,14 @@ class CompanyAI:
         if not prompt or not prompt.strip():
             raise ValueError("prompt cannot be empty")
         context = self.knowledge_base.context(prompt, top_k=top_k) if self.knowledge_base else ""
-        messages: list[Mapping[str, str]] = []
+        messages: list[dict[str, str]] = []
         if system:
             messages.append({"role": "system", "content": system})
         if context:
             messages.append({"role": "system", "content": "Relevant company context:\n" + context})
         messages.append({"role": "user", "content": prompt})
         response = self.router.chat(messages, tools=self.tools.schemas(), **kwargs) if len(self.tools) else self.router.chat(messages, **kwargs)
-        return AIResult(response.content, response.model, context)
+        return AIResult(response.text, response.model, context)
 
     def run(self, inputs: Mapping[str, Any] | None = None) -> WorkflowResult:
         if self.workflow is None:
@@ -54,4 +49,4 @@ class CompanyAI:
         return self.workflow.run(inputs)
 
     def evaluate(self, records: list[Mapping[str, Any]]) -> EvaluationResult:
-        return self.evaluator.evaluate(lambda messages: self.router.chat(messages).content, records)
+        return self.evaluator.evaluate(lambda messages: self.router.chat(messages).text, records)
