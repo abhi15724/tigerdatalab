@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import inspect
 from typing import Any, Callable, Mapping
 
 
@@ -20,30 +19,24 @@ class Tool:
     enabled: bool = True
 
     def schema(self) -> dict[str, Any]:
-        return {
-            "name": self.name,
-            "description": self.description,
-            "parameters": dict(self.parameters),
-        }
+        return {"type": "function", "function": {"name": self.name, "description": self.description, "parameters": dict(self.parameters)}}
 
     def execute(self, arguments: Mapping[str, Any] | None = None) -> Any:
         if not self.enabled:
             raise ToolError(f"Tool '{self.name}' is disabled")
-        args = dict(arguments or {})
         try:
-            return self.function(**args)
+            return self.function(**dict(arguments or {}))
         except TypeError as exc:
             raise ToolError(f"Invalid arguments for tool '{self.name}': {exc}") from exc
 
 
 class ToolRegistry:
     """Explicit allow-list of tools; never executes arbitrary code from model output."""
-
     def __init__(self) -> None:
         self._tools: dict[str, Tool] = {}
 
     def register(self, tool: Tool) -> Tool:
-        if not tool.name or not tool.name.strip():
+        if not tool.name.strip():
             raise ValueError("Tool name cannot be empty")
         if not callable(tool.function):
             raise TypeError("Tool function must be callable")
@@ -59,13 +52,12 @@ class ToolRegistry:
         return wrap
 
     def get(self, name: str) -> Tool:
-        try:
-            return self._tools[name]
-        except KeyError as exc:
-            raise ToolError(f"Unknown tool: {name}") from exc
+        if name not in self._tools:
+            raise ToolError(f"Unknown tool: {name}")
+        return self._tools[name]
 
     def schemas(self) -> list[dict[str, Any]]:
-        return [tool.schema() for tool in self._tools.values() if tool.enabled]
+        return [item.schema() for item in self._tools.values() if item.enabled]
 
     def execute(self, name: str, arguments: Mapping[str, Any] | None = None) -> Any:
         return self.get(name).execute(arguments)
@@ -75,9 +67,8 @@ class ToolRegistry:
 
 
 def tool(name: str, description: str, parameters: Mapping[str, Any] | None = None):
-    """Convenience decorator using a private registry on the function module."""
-    registry = _default_registry
-    return registry.decorator(name, description, parameters)
+    """Convenience decorator backed by the module-level registry."""
+    return _default_registry.decorator(name, description, parameters)
 
 
 _default_registry = ToolRegistry()
