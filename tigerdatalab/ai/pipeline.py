@@ -70,7 +70,14 @@ class AIDataset:
         too_short = too_long = 0
         adapter = _ADAPTERS[self.task]
         for row in self.rows:
-            item = adapter(row)
+            # Mask the source record before format conversion. This keeps PII
+            # accounting independent of the selected training adapter and
+            # correctly handles nested chat records as well as flat rows.
+            safe_row, found = mask_record(row)
+            for kind, count in found.items():
+                pii[kind] = pii.get(kind, 0) + count
+
+            item = adapter(safe_row)
             if not item:
                 rejected += 1
                 continue
@@ -83,17 +90,9 @@ class AIDataset:
                 continue
             records.append(item)
 
-        # Deduplicate before masking so repeated source examples do not inflate
-        # privacy statistics and so the fingerprint remains based on source data.
+        # Deduplicate after canonical format conversion. PII counts reflect the
+        # retained source examples, not repeated copies of the same example.
         records, duplicates = deduplicate(records)
-        masked_records: list[dict[str, Any]] = []
-        for item in records:
-            masked, found = mask_record(item)
-            masked_records.append(masked)
-            for kind, count in found.items():
-                pii[kind] = pii.get(kind, 0) + count
-        records = masked_records
-
         self.validation = validate_records(records, self.task)
         invalid = {issue.index for issue in self.validation.issues}
         if invalid:
@@ -156,7 +155,7 @@ class AIDataset:
         lineage = {
             "source": self.source,
             "task": self.task,
-            "pipeline": ["ingest", "format", "deduplicate", "pii_mask", "validate", "quality", "split", "export"],
+            "pipeline": ["ingest", "format", "pii_mask", "deduplicate", "validate", "quality", "split", "export"],
             "split_strategy": split_strategy,
             "stats": self.stats,
         }
