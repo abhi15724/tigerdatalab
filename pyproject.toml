@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tigerdatalab"
-version = "3.1.0"
-description = "Production local-first data intelligence and AI platform for training data, RAG, workflows, tools, model routing and evaluation."
+version = "3.2.0"
+description = "Production local-first data intelligence and model-agnostic AI platform for training data, fine-tuning, RAG, workflows, tools, routing and evaluation."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
 authors = [{ name = "Abhi" }]
-keywords = ["data-analysis", "business-intelligence", "dataops", "dashboard", "llm", "rag", "ai-agents", "workflows", "training-data", "fine-tuning", "evaluation"]
+keywords = ["data-analysis", "business-intelligence", "dataops", "dashboard", "llm", "rag", "ai-agents", "workflows", "training-data", "fine-tuning", "model-agnostic", "evaluation"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
