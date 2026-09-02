@@ -1,6 +1,10 @@
 name: Publish TigerDataLab to PyPI
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "pyproject.toml"
   release:
     types: [published]
 
