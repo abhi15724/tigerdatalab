@@ -34,7 +34,7 @@ dependencies = [
 large = ["duckdb>=0.10", "pyarrow>=14.0"]
 pdf = ["reportlab>=4.0"]
 train = ["datasets>=2.18", "transformers>=4.40", "trl>=0.8", "accelerate>=0.27", "torch>=2.1"]
-all = ["duckdb>=0.10", "pyarrow>=14.0", "reportlab>=4.0", "datasets>=2.18", "transformers>=4.40", "trl>=0.8", "accelerate>=0.27", "torch>=2.1"]
+all = ["duckdb>=0.10", "pyarrow>=14.0", "reportlab>=4.0"]
 dev = ["pytest>=7.4", "pytest-cov>=4.1"]
 
 [project.urls]
