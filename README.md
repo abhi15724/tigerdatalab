@@ -981,17 +981,196 @@ agent.add_knowledge(
 )
 ```
 
-## 9.4 Connect a model
+## ## 9.4 Connect a Model
+
+TigerDataLab is **provider-agnostic**. You are not limited to OpenAI.
+
+You can connect your Company AI agent to different model providers depending on your company's requirements, including:
+
+* **OpenAI**
+* **Anthropic**
+* **Google Gemini**
+* **Groq**
+* **OpenRouter**
+* **Mistral**
+* **Together AI**
+* Other providers can be integrated through the provider interface.
+
+The same `agent.connect()` pattern is used regardless of the provider.
+
+### OpenAI
 
 ```python
 from tigerdatalab.ai.providers import OpenAIProvider
 
 agent.connect(
     OpenAIProvider(),
+    model="your-openai-model",
+    system="You are the Acme Accounts Payable assistant. Follow company policy.",
+)
+```
+
+### Anthropic
+
+```python
+from tigerdatalab.ai.providers import AnthropicProvider
+
+agent.connect(
+    AnthropicProvider(),
+    model="your-anthropic-model",
+    system="You are the Acme Accounts Payable assistant. Follow company policy.",
+)
+```
+
+### Google Gemini
+
+```python
+from tigerdatalab.ai.providers import GeminiProvider
+
+agent.connect(
+    GeminiProvider(),
+    model="your-gemini-model",
+    system="You are the Acme Accounts Payable assistant. Follow company policy.",
+)
+```
+
+### Groq
+
+```python
+from tigerdatalab.ai.providers import GroqProvider
+
+agent.connect(
+    GroqProvider(),
+    model="your-groq-model",
+    system="You are the Acme Accounts Payable assistant. Follow company policy.",
+)
+```
+
+### OpenRouter
+
+```python
+from tigerdatalab.ai.providers import OpenRouterProvider
+
+agent.connect(
+    OpenRouterProvider(),
     model="your-model",
     system="You are the Acme Accounts Payable assistant. Follow company policy.",
 )
 ```
+
+OpenRouter can also be useful when you want to access models from multiple model providers through a common API.
+
+### Mistral
+
+```python
+from tigerdatalab.ai.providers import MistralProvider
+
+agent.connect(
+    MistralProvider(),
+    model="your-mistral-model",
+    system="You are the Acme Accounts Payable assistant. Follow company policy.",
+)
+```
+
+### Together AI
+
+```python
+from tigerdatalab.ai.providers import TogetherProvider
+
+agent.connect(
+    TogetherProvider(),
+    model="your-model",
+    system="You are the Acme Accounts Payable assistant. Follow company policy.",
+)
+```
+
+### Provider selection
+
+You can therefore build the same Company AI application with different model providers:
+
+```text
+                         TigerDataLab
+                              │
+                       Company AI Agent
+                              │
+                       agent.connect()
+                              │
+       ┌──────────┬───────────┼───────────┬───────────┐
+       ↓          ↓           ↓           ↓           ↓
+    OpenAI    Anthropic    Gemini       Groq     OpenRouter
+       │          │           │           │           │
+       └──────────┴───────────┴───────────┴───────────┘
+                              │
+                         AI Model
+                              │
+                    Company Knowledge
+                    + RAG + Tools
+                    + Workflows
+                    + Evaluation
+```
+
+### Why provider-agnostic?
+
+This allows companies to choose models based on:
+
+| Requirement          | Possible consideration                              |
+| -------------------- | --------------------------------------------------- |
+| Model quality        | Choose the model that performs best for your task   |
+| Cost                 | Use a lower-cost model for high-volume workloads    |
+| Latency              | Choose a faster provider for real-time applications |
+| Privacy requirements | Select an appropriate deployment/provider           |
+| Model capabilities   | Choose models supporting the required capabilities  |
+| Vendor flexibility   | Avoid depending on a single AI provider             |
+| Experimentation      | Compare multiple models using the same application  |
+
+### API keys
+
+Provider credentials should normally be supplied through environment variables rather than hard-coded in your application.
+
+For example:
+
+```bash
+# OpenAI
+OPENAI_API_KEY=...
+
+# Anthropic
+ANTHROPIC_API_KEY=...
+
+# Google Gemini
+GEMINI_API_KEY=...
+
+# Groq
+GROQ_API_KEY=...
+
+# OpenRouter
+OPENROUTER_API_KEY=...
+
+# Mistral
+MISTRAL_API_KEY=...
+
+# Together AI
+TOGETHER_API_KEY=...
+```
+
+The exact environment variable depends on the provider.
+
+### Important
+
+**TigerDataLab does not require your Company AI application to use OpenAI.**
+
+The provider is a replaceable component:
+
+```python
+agent.connect(
+    PROVIDER,
+    model="MODEL_NAME",
+)
+```
+
+Your company knowledge, RAG pipeline, tools, workflows, and application logic can remain the same while you change the underlying model provider.
+
+This makes TigerDataLab suitable for **multi-provider and model-flexible AI applications**.
+
 
 ## 9.5 Ask the agent
 
