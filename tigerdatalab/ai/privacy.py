@@ -5,7 +5,7 @@ import re
 from typing import Any
 
 _PATTERNS = {
-    "email": re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b"),
+    "email": re.compile(r"(?<![\w.+-])[\w.+-]+@[\w-]+(?:\.[\w-]+)+(?![\w.-])"),
     "phone": re.compile(r"(?<!\d)(?:\+?\d[\d\s().-]{7,}\d)(?!\d)"),
     "ipv4": re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"),
     "credit_card": re.compile(r"\b(?:\d[ -]*?){13,19}\b"),
