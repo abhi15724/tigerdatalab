@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 from .core import analyze
-from .ai import AIDataset, CompanyAI, KnowledgeBase, ModelRouter, UniversalTrainer
+from .ai import AIDataset, CompanyAI, Document, KnowledgeBase, ModelRouter, UniversalTrainer
 from .ai.providers import Provider
 
 
@@ -111,9 +111,10 @@ class CompanyAIProject:
     ai: CompanyAI | None = None
     knowledge_base: KnowledgeBase = field(default_factory=KnowledgeBase)
     workflow: Any = None
+    _system: str | None = field(default=None, repr=False)
 
     def add_knowledge(self, source: str, text: str, **metadata: Any) -> "CompanyAIProject":
-        self.knowledge_base.add(__import__("tigerdatalab.ai", fromlist=["Document"]).Document(source, text, {k: str(v) for k, v in metadata.items()}))
+        self.knowledge_base.add(Document(source, text, {k: str(v) for k, v in metadata.items()}))
         return self
 
     def connect(self, provider: Provider, model: str, *, system: str | None = None) -> "CompanyAIProject":
@@ -130,9 +131,8 @@ class CompanyAIProject:
     def ask(self, prompt: str, **kwargs: Any):
         if self.ai is None:
             raise ValueError("Connect or attach a CompanyAI before asking questions")
-        system = getattr(self, "_system", None)
-        if system is not None and "system" not in kwargs:
-            kwargs["system"] = system
+        if self._system is not None and "system" not in kwargs:
+            kwargs["system"] = self._system
         return self.ai.ask(prompt, **kwargs)
 
     def run(self, inputs: dict[str, Any] | None = None):
