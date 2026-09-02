@@ -453,14 +453,23 @@ The important principle is that the **LLM is one component inside the workflow**
 Use RAG when the AI needs information that changes frequently or belongs to the company.
 
 ```python
-from tigerdatalab.ai import KnowledgeBase
+from tigerdatalab.ai import Document, KnowledgeBase
 
 kb = KnowledgeBase()
 
-kb.add("finance", "Refunds are issued within 7 business days.")
-kb.add("support", "Priority customers receive 24/7 support.")
+kb.add(Document(
+    "finance-policy",
+    "Refunds are issued within 7 business days.",
+    {"department": "finance"},
+))
+kb.add(Document(
+    "support-policy",
+    "Priority customers receive 24/7 support.",
+    {"department": "support"},
+))
 
 print(kb.search("refund timing", top_k=3))
+print(kb.context("refund timing", top_k=3))
 ```
 
 The built-in retrieval layer is dependency-light and deterministic. Production systems can place embeddings and a vector database behind the same knowledge boundary.
@@ -654,10 +663,26 @@ CLI smoke test:
 tigerdatalab analyze tests/data/sales.csv
 ```
 
+# PyPI Publishing
+
+TigerDataLab uses GitHub Actions Trusted Publishing for PyPI. A GitHub Release triggers the publication workflow after the complete test matrix passes and the distributions pass `twine check`.
+
+For maintainers publishing a release:
+
+```bash
+git tag v4.0.0
+git push origin v4.0.0
+```
+
+Then create/publish the corresponding GitHub Release. The repository's `.github/workflows/publish.yml` builds and publishes the package to PyPI using an OIDC trusted publisher, so no long-lived PyPI token is stored in the repository.
+
+After publication:
+
+```bash
+python -m pip install --upgrade tigerdatalab
+python -c "import tigerdatalab; print(tigerdatalab.__version__)"
+```
+
 # Version
 
 **4.0.0** — Unified Data-to-AI Platform.
-
-# License
-
-MIT License
