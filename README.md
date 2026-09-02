@@ -71,19 +71,19 @@ TigerDataLab connects the complete journey from **business data → trusted data
 
 ---
 
-# 📦 Installation
+## 📦 Installation
 
 ```bash
 python -m pip install tigerdatalab
 ```
 
-### AI training capabilities
+AI training extras:
 
 ```bash
 python -m pip install "tigerdatalab[train]"
 ```
 
-### Full optional capabilities
+Full optional capabilities:
 
 ```bash
 python -m pip install "tigerdatalab[all]"
@@ -91,538 +91,189 @@ python -m pip install "tigerdatalab[all]"
 
 ---
 
-# ⚡ Quick Start
+## ⚡ Quick Start
 
 ```python
 from tigerdatalab import create_project
 
 tdl = create_project("my-company")
-
 result = tdl.analyze("sales.xlsx")
-
 print(result.summary())
 print(result.kpis())
 ```
 
-The same project can support analytics, engineering, data science, AI training and Company AI workflows.
-
 ---
 
-# 📊 1. Data Analyst
+## 🤖 AI Training
 
-### Typical workflow
+TigerDataLab provides the AI data and training layer between raw data and a compatible training system.
 
 ```text
-Sales / Finance / Customer Data
-            ↓
-       Load Dataset
-            ↓
-    Profile + Quality Check
-            ↓
-       KPIs + Trends
-            ↓
-     Business Insights
-            ↓
-      Dashboard / Report
+Raw Examples → Format → PII → Deduplicate → Validate → Quality
+                                                        ↓
+                                               Train / Val / Test
+                                                        ↓
+                                                  JSONL Export
+                                                        ↓
+                                               Training Backend
 ```
 
-### Example
-
-```python
-from tigerdatalab import create_project
-
-tdl = create_project("sales-analysis")
-result = tdl.analyze("sales.xlsx")
-
-print(result.summary())
-print(result.kpis())
-print(result.quality())
-print(result.insights())
-```
-
-### Use cases
-
-- Sales and revenue analysis
-- Customer analysis
-- Finance reporting
-- KPI monitoring
-- Data-quality investigation
-- Trend analysis
-- Business insights
-- Dashboard generation
-- PDF/report generation
+Supported dataset styles include **SFT, DPO, Classification, Instruction and Text**. Training adapters support compatible open/self-hosted models and other backends where a supported SDK/API/adapter exists.
 
 ---
 
-# 🧪 2. Data Scientist
+## 🏢 Company AI
 
-Use TigerDataLab before model development to understand and prepare data.
-
-```python
-frame = tdl.load("customers.csv")
-
-profile = tdl.profile(frame)
-print(profile)
-
-train, test = tdl.data_science.train_test_split(
-    frame,
-    test_size=0.2,
-    seed=42,
-)
-
-correlation = tdl.data_science.correlation(train)
-print(correlation)
-```
+Company AI combines current knowledge, stable behavior, controlled workflows, approved tools/APIs and evaluation.
 
 ```text
-Raw Dataset
-    ↓
-Profile
-    ↓
-Quality Check
-    ↓
-Clean / Transform
-    ↓
-Reproducible Split
-    ↓
-Statistical / Feature Analysis
-    ↓
-Your ML Framework
-```
-
-TigerDataLab focuses on the data preparation layer; connect the resulting data to your preferred ML framework.
-
----
-
-# ⚙️ 3. Data Engineer
-
-Build deterministic, testable data transformations.
-
-```python
-frame = tdl.load("sales.csv")
-
-pipeline = (
-    tdl.engineering
-    .add("fill_missing", lambda df: df.fillna(0))
-    .add("positive_sales", lambda df: df[df["sales"] >= 0])
-)
-
-clean = pipeline.run(frame)
-pipeline.save_manifest("pipeline.json")
-```
-
-```text
-CSV / Excel / JSON / Parquet
-            ↓
-          Load
-            ↓
-        Validate
-            ↓
-    Transform / Clean
-            ↓
-        Aggregate
-            ↓
-       Trusted Data
-            ↓
-   Analytics / ML / AI
+Company Data → Trusted Data → Knowledge / RAG
+                              ↓
+                    Rules + Workflow + Tools
+                              ↓
+                     Model Router / AI Layer
+                              ↓
+                         Evaluation
+                              ↓
+                     Production Company AI
 ```
 
 ---
 
-# 🤖 4. AI Training — Build Better Training Data
+## 🔀 Intelligent Multi-Provider Model Routing
 
-TigerDataLab provides the **AI data and training layer** between raw data and a compatible training system.
+TigerDataLab is **not limited to OpenAI**. `ModelRouter` can combine any registered provider, including OpenAI, Anthropic, Google Gemini, Groq, Mistral, OpenRouter, Together AI, and custom `Provider` implementations.
 
-```text
-Raw Examples
-     ↓
-   Ingest
-     ↓
-Task Formatting
-     ↓
- PII Detection
-     ↓
- PII Masking
-     ↓
-Deduplication
-     ↓
-Schema Validation
-     ↓
- Quality Checks
-     ↓
-Train / Val / Test
-     ↓
- JSONL Export
-     ↓
-Training Backend
-```
-
-### Supported dataset styles
-
-| Dataset | Typical structure |
-|---|---|
-| **SFT** | Prompt / response or chat examples |
-| **DPO** | Prompt + preferred + rejected response |
-| **Classification** | Text + label |
-| **Instruction** | Instruction + input + output |
-| **Text** | General text examples |
-
-### Example
+### Simple fallback — backward compatible
 
 ```python
-ai_project = tdl.ai_training(
-    "support-model",
-    task="sft",
-)
-
-dataset = ai_project.prepare(
-    "support_examples.csv",
-    "training_data",
-)
-
-print(dataset.summary())
-```
-
-### Data quality layer
-
-✅ Schema validation  
-✅ PII detection and masking  
-✅ Deduplication  
-✅ Quality checks  
-✅ Deterministic dataset splits  
-✅ Dataset lineage  
-✅ Dataset cards  
-✅ Quality reports  
-✅ JSONL export
-
-### Train a compatible open/self-hosted model
-
-```python
-trainer = ai_project.trainer(
-    "Qwen/Qwen3-0.6B",
-    "./models/support",
-)
-
-trainer.train_sft(
-    "training_data/train.jsonl",
-    epochs=1,
-)
-```
-
-TigerDataLab is model-agnostic through training adapters. It does **not** claim that every proprietary hosted LLM can have its weights modified.
-
----
-
-# 🏢 5. Company AI — Teach AI Your Business
-
-Company AI is more than fine-tuning a model.
-
-```text
-┌──────────────────────────────────────────────┐
-│             COMPANY AI SYSTEM                │
-├──────────────────────────────────────────────┤
-│ 🧠 KNOWLEDGE  → What the company knows       │
-│ 🎯 BEHAVIOR   → How the AI should respond    │
-│ 🔄 WORKFLOW   → How the process must run     │
-│ 🔐 TOOLS      → What actions are allowed     │
-└──────────────────────────────────────────────┘
-```
-
-### Example
-
-```python
-from tigerdatalab import create_project
-from tigerdatalab.ai import OpenAIProvider
-
-tdl = create_project("acme-support")
-company = tdl.company_ai("customer-support")
-
-company.add_knowledge(
-    "returns-policy",
-    "Unused products can be returned within 30 days.",
-    department="support",
-)
-
-company.connect(
-    OpenAIProvider(),
-    "your-model",
-    system="Follow company policy and use approved company knowledge.",
-)
-
-answer = company.ask("What is our return policy?")
-print(answer.output)
-```
-
----
-
-# 🔄 Company AI Workflow Training
-
-For real business automation, **do not rely on a prompt alone**. Define the business process explicitly.
-
-### Customer Return Workflow
-
-```text
-Customer Request
-       ↓
-Identify Customer
-       ↓
-Retrieve Order
-       ↓
-Check Payment / Order Status
-       ↓
-Retrieve Company Policy
-       ↓
-Check Eligibility
-       ↓
-Apply Business Rules
-       ↓
- ┌───────────────┬────────────────┐
- │   Eligible    │  Not Eligible  │
- ↓               ↓                │
-Create Return    Explain Policy   │
- │               │                │
- └───────────────┴────────────────┘
-       ↓
-Escalate High-Risk Cases
-       ↓
-Final Response
-```
-
-### Invoice dispute workflow
-
-```yaml
-workflow: invoice_dispute
-steps:
-  - identify_customer
-  - retrieve_invoice
-  - check_payment
-  - check_dispute
-  - apply_policy
-  - determine_resolution
-  - respond_customer
-
-conditions:
-  escalation:
-    if: dispute_amount > 10000
-```
-
-> **The LLM is a component inside the workflow — not the workflow itself.**
-
----
-
-# 🔎 RAG — Give Company AI Current Knowledge
-
-Use RAG when the AI needs changing company information, policies or documents.
-
-```python
-from tigerdatalab.ai import Document, KnowledgeBase
-
-kb = KnowledgeBase()
-
-kb.add(Document(
-    "finance-policy",
-    "Refunds are issued within 7 business days.",
-    {"department": "finance"},
-))
-
-print(kb.context("refund timing", top_k=3))
-```
-
-Production systems can place embeddings and a vector database behind the knowledge boundary.
-
-### RAG vs Fine-Tuning vs Workflow
-
-| Requirement | Recommended approach |
-|---|---|
-| Frequently changing company information | 🔎 RAG |
-| Policies and documents | 🔎 RAG |
-| Stable response behavior | 🧠 Fine-tuning |
-| Output format | 🧠 Fine-tuning / prompt / schema |
-| Multi-step business process | 🔄 Workflow |
-| Taking business-system actions | 🔐 Approved tools/APIs |
-| Measuring quality | 📈 Evaluation |
-
----
-
-# 🔐 Tools, APIs and Safety
-
-Company AI should use explicit, allow-listed tools rather than arbitrary model-generated code.
-
-```python
-from tigerdatalab.ai import Tool, ToolRegistry
-
-registry = ToolRegistry()
-
-registry.register(Tool(
-    name="get_order",
-    description="Get an order by ID",
-    function=get_order,
-    parameters={
-        "type": "object",
-        "properties": {
-            "order_id": {"type": "string"}
-        },
-        "required": ["order_id"],
-    },
-))
-```
-
-### Security principles
-
-- 🔑 Keep API keys outside source code and datasets.
-- 🛡️ Use environment variables or a secrets manager.
-- 🔒 Allow-list tools and business actions.
-- 👤 Use human approval for high-risk decisions.
-- 🧾 Keep dataset lineage and evaluation evidence.
-- 🚫 Never treat arbitrary model output as executable Python or shell code.
-
----
-
-# 📈 Evaluate Before Production
-
-```python
-from tigerdatalab.ai import evaluate
-
-result = evaluate(
-    lambda messages: "4",
-    [{"prompt": "2+2?", "expected": "4"}],
-)
-
-print(result.score)
-print(result.average_latency_ms)
-```
-
-For a company system, evaluate:
-
-- Answer accuracy
-- Policy compliance
-- Hallucination rate
-- Workflow compliance
-- Tool success rate
-- Latency
-- Model/version regression
-- Human approval rate
-- Escalation accuracy
-
----
-
-# 🌐 Supported Model Providers
-
-TigerDataLab includes provider adapters for:
-
-**OpenAI · Anthropic · Google Gemini · Groq · OpenRouter · Mistral · Together AI · OpenAI-compatible endpoints**
-
-```python
-from tigerdatalab.ai import ModelRouter, OpenAIProvider
+from tigerdatalab.ai import ModelRouter, OpenAIProvider, AnthropicProvider
 
 router = ModelRouter()
-router.add(OpenAIProvider(), "primary-model")
-router.add(OpenAIProvider(), "fallback-model")
+router.add(OpenAIProvider(), "gpt-5")
+router.add(AnthropicProvider(), "claude-sonnet")
+
+answer = router.chat([
+    {"role": "user", "content": "Summarize this customer issue."}
+])
 ```
 
----
+### Cost-aware routing
 
-# 🏗️ End-to-End Data → AI Architecture
+```python
+from tigerdatalab.ai import ModelRouter, OpenAIProvider, GroqProvider
 
-```text
-Company CSV / Excel / Database / API
-                ↓
-        ⚙️ DATA ENGINEERING
-                ↓
-       Clean + Validate + PII
-                ↓
-         📊 DATA ANALYTICS
-                ↓
-       KPIs + Insights + Reports
-                ↓
-         🧪 DATA SCIENCE
-                ↓
-       ML / Feature Preparation
-                ↓
-         🤖 AI DATA LAYER
-                ↓
-     Training Dataset + RAG Data
-                ↓
-        🏢 COMPANY AI LAYER
-                ↓
-      Knowledge + Rules + Workflow
-                ↓
-         Tools + Business APIs
-                ↓
-          🌐 AI / LLM Provider
-                ↓
-           📈 EVALUATION
-                ↓
-       🚀 PRODUCTION COMPANY AI
+router = ModelRouter(strategy="cost")
+router.add(OpenAIProvider(), "gpt-5-mini", estimated_cost_per_1k_tokens=0.40)
+router.add(GroqProvider(), "llama-model", estimated_cost_per_1k_tokens=0.08)
+answer = router.chat(messages)
 ```
 
----
+### Latency-aware routing
 
-# 🧩 Architecture Principles
+```python
+router = ModelRouter(strategy="latency")
+router.add(provider_a, "fast-model", estimated_latency_ms=150)
+router.add(provider_b, "slow-model", estimated_latency_ms=900)
+```
 
-| Principle | TigerDataLab approach |
+### Capability-aware routing
+
+```python
+router = ModelRouter(strategy="balanced")
+router.add(text_model, "text-model", capabilities=("chat",))
+router.add(vision_model, "vision-model", capabilities=("chat", "vision"))
+answer = router.chat(messages, required_capabilities={"vision"})
+```
+
+### Health-aware fallback
+
+The router tracks success/failure counts and observed latency, temporarily removes repeatedly failing targets through a cooldown, and falls back to another eligible provider. Use `router.health()` for non-secret telemetry.
+
+Available strategies:
+
+| Strategy | Behavior |
 |---|---|
-| **Local-first** | Data preparation does not require an LLM API |
-| **Model-agnostic** | Provider and training adapters |
-| **Reproducible** | Deterministic dataset splitting and seeds |
-| **Secure** | Secrets outside datasets; allow-listed tools |
-| **Inspectable** | Lineage, manifests, quality reports and evaluation |
-| **Backward compatible** | Existing analytics APIs remain available |
-| **Explicit capabilities** | Unsupported training operations fail clearly |
+| `ordered` | Original first-success/fallback behavior |
+| `cost` | Prefer lowest configured model cost |
+| `latency` | Prefer lowest configured latency |
+| `balanced` | Combine configured cost, latency and observed reliability |
+
+Cost and latency estimates are user-supplied routing metadata; TigerDataLab does not claim live provider pricing or latency.
 
 ---
 
-# 📁 Project Structure
+## 🔎 RAG, Workflows and Tools
 
-```text
-tigerdatalab/
-├── analytics/          # Business analytics
-├── dashboard/          # Dashboard generation
-├── dataops/            # Data operations
-├── insights/           # Insight generation
-├── ai/                 # Training, RAG, providers, tools, workflows
-├── cli/                # Command-line interface
-├── core.py             # Core analytics API
-├── platform.py         # Unified Data-to-AI project API
-└── config.py           # Package configuration
-```
+Use **RAG** for changing company knowledge, **fine-tuning** for stable behavior, **workflows** for controlled multi-step processes, and **allow-listed tools/APIs** for business actions.
+
+The LLM is a component inside the workflow — not the workflow itself.
 
 ---
 
-# 🧪 Testing
+## 📈 Evaluation
+
+Evaluate accuracy, policy compliance, hallucination rate, workflow compliance, tool success, latency and model/version regressions before production.
+
+---
+
+## 🔐 Security
+
+- Keep API keys outside source code and datasets.
+- Use environment variables or a secrets manager.
+- Allow-list tools and business actions.
+- Use human approval for high-risk decisions.
+- Keep dataset lineage and evaluation evidence.
+- Never treat arbitrary model output as executable Python or shell code.
+
+---
+
+## 🌐 Supported Model Providers
+
+TigerDataLab includes adapters for **OpenAI, Anthropic, Google Gemini, Groq, OpenRouter, Mistral, Together AI, and OpenAI-compatible endpoints**.
+
+You can also implement your own provider by subclassing `Provider`.
+
+---
+
+## 🧪 Testing
 
 ```bash
 python -m pip install -e ".[all,dev]"
 python -m pytest -v
 ```
 
-CI tests Python 3.10, 3.11 and 3.12 and runs the CLI smoke test.
+---
+
+## 🌍 Read TigerDataLab in Your Language
+
+- 🇬🇧 **English:** `README.md`
+- 🇮🇳 **हिंदी:** `README.hi.md`
 
 ---
 
-# 🌍 Read TigerDataLab in Your Language
+## 🏗️ End-to-End Architecture
 
-The primary documentation is maintained in English, with a Hindi translation available:
-
-- 🇬🇧 **English:** [README.md](README.md)
-- 🇮🇳 **हिंदी:** [README.hi.md](README.hi.md)
-
-More translations can be added as `README.<language>.md` files while keeping the English README as the canonical technical reference.
+```text
+Company Data
+    ↓
+Data Engineering → Data Quality → Analytics / Data Science
+    ↓
+Trusted AI Data → AI Dataset Builder → Training / RAG
+    ↓
+Company Knowledge + Rules + Workflow + Tools
+    ↓
+Intelligent Model Router
+    ↓
+OpenAI / Claude / Gemini / Groq / Mistral / OpenRouter / Together / Custom
+    ↓
+Evaluation + Monitoring
+    ↓
+Production AI
+```
 
 ---
 
-# 📜 Important Scope
+## 📄 License
 
-TigerDataLab is a **Data-to-AI engineering platform**. It helps teams turn raw data and business processes into trustworthy analytics, training datasets, company knowledge, workflows and AI applications.
-
-It is **not** a claim that one API can modify the weights of every proprietary LLM. Hosted models can only be fine-tuned when their provider exposes compatible training capabilities. Unsupported models can still be improved at the application layer through RAG, tools, workflows, routing and evaluation.
-
----
-
-<div align="center">
-
-## 🐯 Build Data. Teach AI. Automate Work.
-
-**TigerDataLab 4.0.0**
-
-</div>
+See `LICENSE` for the project license.
