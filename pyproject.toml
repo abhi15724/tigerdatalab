@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tigerdatalab"
-version = "3.0.4"
+version = "3.0.5"
 description = "Automated Data Analytics + Data Quality + Visualization + BI + DataOps platform, built on pandas/numpy/duckdb/plotly."
 readme = "README.md"
 license = { text = "MIT" }
