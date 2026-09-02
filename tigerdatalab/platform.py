@@ -1,9 +1,4 @@
-"""Unified production-oriented Data-to-AI platform facade.
-
-This module composes TigerDataLab's analytics, DataOps and AI layers into one
-project API. Credentials and business data are intentionally not persisted by
-this facade.
-"""
+"""Unified production-oriented Data-to-AI platform facade."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -52,9 +47,7 @@ class DataPipeline:
         return current
 
     def save_manifest(self, path: str | Path) -> None:
-        Path(path).write_text(
-            json.dumps({"steps": [name for name, _ in self.steps]}, indent=2), encoding="utf-8"
-        )
+        Path(path).write_text(json.dumps({"steps": [name for name, _ in self.steps]}, indent=2), encoding="utf-8")
 
 
 class DataScience:
@@ -64,14 +57,7 @@ class DataScience:
     def profile(frame: pd.DataFrame) -> DatasetProfile:
         numeric = tuple(frame.select_dtypes(include=[np.number]).columns.astype(str))
         categorical = tuple(c for c in frame.columns.astype(str) if c not in numeric)
-        return DatasetProfile(
-            rows=len(frame),
-            columns=len(frame.columns),
-            missing_cells=int(frame.isna().sum().sum()),
-            duplicate_rows=int(frame.duplicated().sum()),
-            numeric_columns=numeric,
-            categorical_columns=categorical,
-        )
+        return DatasetProfile(len(frame), len(frame.columns), int(frame.isna().sum().sum()), int(frame.duplicated().sum()), numeric, categorical)
 
     @staticmethod
     def train_test_split(frame: pd.DataFrame, test_size: float = 0.2, seed: int = 42) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -115,6 +101,8 @@ class CompanyAIProject:
 
     def add_knowledge(self, source: str, text: str, **metadata: Any) -> "CompanyAIProject":
         self.knowledge_base.add(Document(source, text, {k: str(v) for k, v in metadata.items()}))
+        if self.ai is not None:
+            self.ai.knowledge_base = self.knowledge_base
         return self
 
     def connect(self, provider: Provider, model: str, *, system: str | None = None) -> "CompanyAIProject":
@@ -126,6 +114,7 @@ class CompanyAIProject:
 
     def attach(self, ai: CompanyAI) -> "CompanyAIProject":
         self.ai = ai
+        self.ai.knowledge_base = self.knowledge_base
         return self
 
     def ask(self, prompt: str, **kwargs: Any):
@@ -143,7 +132,6 @@ class CompanyAIProject:
 
 class TigerDataLab:
     """Single entry point for data analytics, engineering, data science and AI."""
-
     def __init__(self, project: str = "default") -> None:
         if not project.strip():
             raise ValueError("project cannot be empty")
@@ -154,27 +142,16 @@ class TigerDataLab:
     def load(self, source: str | Path) -> pd.DataFrame:
         path = Path(source)
         suffix = path.suffix.lower()
-        if suffix == ".csv":
-            return pd.read_csv(path)
-        if suffix in {".json", ".jsonl"}:
-            return pd.read_json(path, lines=suffix == ".jsonl")
-        if suffix in {".xlsx", ".xls"}:
-            return pd.read_excel(path)
-        if suffix == ".parquet":
-            return pd.read_parquet(path)
+        if suffix == ".csv": return pd.read_csv(path)
+        if suffix in {".json", ".jsonl"}: return pd.read_json(path, lines=suffix == ".jsonl")
+        if suffix in {".xlsx", ".xls"}: return pd.read_excel(path)
+        if suffix == ".parquet": return pd.read_parquet(path)
         raise ValueError(f"Unsupported data source: {suffix or 'no extension'}")
 
-    def profile(self, frame: pd.DataFrame) -> DatasetProfile:
-        return self.data_science.profile(frame)
-
-    def analyze(self, source: str | Path):
-        return analyze(source)
-
-    def ai_training(self, name: str, task: str = "sft") -> AIProject:
-        return AIProject(name=name, task=task)
-
-    def company_ai(self, name: str) -> CompanyAIProject:
-        return CompanyAIProject(name=name)
+    def profile(self, frame: pd.DataFrame) -> DatasetProfile: return self.data_science.profile(frame)
+    def analyze(self, source: str | Path): return analyze(source)
+    def ai_training(self, name: str, task: str = "sft") -> AIProject: return AIProject(name=name, task=task)
+    def company_ai(self, name: str) -> CompanyAIProject: return CompanyAIProject(name=name)
 
 
 def create_project(name: str = "default") -> TigerDataLab:
