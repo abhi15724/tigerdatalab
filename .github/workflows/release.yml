@@ -23,18 +23,15 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
-
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-
       - name: Install package and test dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e ".[all,dev]"
-
       - name: Run test suite
         run: python -m pytest -v
 
@@ -47,22 +44,17 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
-
       - name: Install build tools
         run: python -m pip install --upgrade pip build twine
-
       - name: Build wheel and source distribution
         run: python -m build
-
       - name: Validate distribution metadata
         run: python -m twine check dist/*
-
       - name: Upload distribution artifact
         uses: actions/upload-artifact@v4
         with:
@@ -70,9 +62,27 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download distribution artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: python-distributions
+          path: dist
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: dist/*
+
   publish:
     name: Publish to PyPI
-    needs: build
+    needs: release
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -86,7 +96,6 @@ jobs:
         with:
           name: python-distributions
           path: dist
-
       - name: Publish distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
