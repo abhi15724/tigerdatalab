@@ -1,72 +1,87 @@
 # TigerDataLab
 
-**TigerDataLab** is a local-first **Data Analytics + Data Quality + Visualization + Business Intelligence + DataOps + AI Training Data + LLM Fine-Tuning** platform for Python. It complements pandas, NumPy, DuckDB, Plotly, Hugging Face Datasets, Transformers and TRL rather than replacing them.
+**TigerDataLab is a production-ready, local-first data intelligence and AI application layer for companies.** It turns raw business data into trustworthy datasets, knowledge, workflows, tools and evaluation pipelines around the AI/LLM a company already uses.
 
-> **Analyze. Clean. Understand. Prepare. Fine-tune.**
+> **Don’t replace your AI. Teach it your business.**
 
-## 🚀 What's new in v3.0.7
+TigerDataLab complements existing models such as GPT, Claude, Gemini, Qwen, Llama and Mistral. It does not claim to retrain proprietary hosted models. Instead, it prepares high-quality training data, provides RAG, orchestrates supported fine-tuning, connects safe tools, runs business workflows and evaluates model behavior.
 
-TigerDataLab v3.0.7 brings the project together as an end-to-end data-to-model workflow:
+## v3.1.0 — Production AI Platform
 
-- AI training-data preparation for **SFT, conversational, DPO, classification and text** datasets
-- Schema validation, quality scoring, deduplication and deterministic dataset splitting
-- Local **PII detection and deterministic masking** before training export
-- Dataset lineage and dataset-card style metadata
-- JSONL training-data export
-- Optional Hugging Face + TRL supervised fine-tuning orchestration
-- Existing analytics, DataOps, large-data, dashboard, visualization and reporting capabilities remain available
-- Python **3.10–3.13** support declared in the package metadata
-- GitHub Actions-based build/test/release workflow with PyPI Trusted Publishing/OIDC
+The 3.1 release adds the missing application layer on top of the existing analytics and AI training-data foundation:
+
+- AI provider abstraction with environment-based credentials
+- Retrieval-augmented generation (RAG) knowledge base and deterministic lexical search
+- Safe explicit tool registry and provider-compatible function schemas
+- Deterministic business workflow engine with conditions and bounded execution
+- Model router with ordered fallbacks
+- Versioned registry for datasets, knowledge bases, models, tools, workflows, evaluations and systems
+- `CompanyAI` composition API combining models, RAG, tools, workflows and evaluation
+- Existing analytics, DataOps, large-data, dashboard, reporting and training-data APIs preserved
+- Optional Hugging Face + TRL fine-tuning remains opt-in
+- Core runtime remains free of mandatory LLM vendor SDKs
+- Python 3.10–3.13 supported
+- GitHub Actions + PyPI Trusted Publishing release pipeline
+
+## What TigerDataLab does
+
+```text
+Company data
+    ↓
+Clean + validate + protect PII
+    ↓
+Training datasets / knowledge base
+    ↓
+RAG + fine-tuning + tools
+    ↓
+Existing AI/LLM
+    ↓
+Business workflow
+    ↓
+Evaluation
+    ↓
+Company-specific AI application
+```
+
+### Example business workflow
+
+A logistics company can implement:
+
+```text
+Customer asks about shipment
+        ↓
+Retrieve company policy + shipment context
+        ↓
+Check shipment status
+        ↓
+Calculate SLA breach
+        ↓
+Determine compensation eligibility
+        ↓
+Generate customer response
+        ↓
+Escalate if required
+```
 
 ## Install
-
-### Core
 
 ```bash
 python -m pip install tigerdatalab
 ```
 
-### All data/analytics features
+Optional large-data/reporting dependencies:
 
 ```bash
 python -m pip install "tigerdatalab[all]"
 ```
 
-### AI training-data preparation
-
-The preparation layer does **not** require an LLM API key.
-
-```bash
-python -m pip install tigerdatalab
-```
-
-### Actual LLM fine-tuning
-
-Install the optional training backend only when you want to train a model:
+Optional model-training backend:
 
 ```bash
 python -m pip install "tigerdatalab[train]"
 ```
 
-## ⚡ Quick start
-
-### Analyze a dataset
-
-```python
-import tigerdatalab as tdl
-
-result = tdl.analyze("sales.xlsx")
-
-print(result.summary())
-print(result.kpis())
-print(result.quality())
-print(result.insights())
-
-result.dashboard("analysis/dashboard.html")
-result.report("analysis")
-```
-
-### Prepare AI training data
+## Quick start: data → AI training set
 
 ```python
 from tigerdatalab.ai import AIDataset
@@ -76,221 +91,200 @@ rows = [
     {"prompt": "What is AOV?", "response": "AOV is average order value."},
 ]
 
-dataset = AIDataset(rows, task="sft").run()
-
-print(dataset.stats)
-dataset.export("training_data")
+data = AIDataset(rows, task="sft").run()
+print(data.stats)
+data.export("training_data")
 ```
 
-The pipeline handles format preparation, validation, privacy protection, deduplication, quality scoring, deterministic splitting and JSONL export.
+The pipeline supports format conversion, schema validation, quality scoring, PII detection/masking, deduplication, deterministic splitting, lineage and JSONL export.
 
-## 🤖 Fine-tune an LLM
-
-TigerDataLab can orchestrate supervised fine-tuning of Hugging Face causal language models through the optional TRL backend.
+## Build a company AI application
 
 ```python
-from tigerdatalab.ai import AIDataset, LLMTrainer
+from tigerdatalab.ai import CompanyAI, KnowledgeBase, ModelRouter, OpenAIProvider
 
-rows = [
-    {"prompt": "What is revenue?", "response": "Revenue is income generated from sales."},
-    {"prompt": "What is AOV?", "response": "AOV is average order value."},
+provider = OpenAIProvider()  # reads OPENAI_API_KEY from the environment
+router = ModelRouter().add(provider, "your-model")
+
+kb = KnowledgeBase()
+kb.add("returns", "Customers can return unused products within 30 days.")
+
+ai = CompanyAI(router, knowledge_base=kb)
+result = ai.ask("What is the return policy?")
+print(result.output)
+```
+
+No API key is stored in datasets, lineage or registry metadata.
+
+## RAG / knowledge base
+
+```python
+from tigerdatalab.ai import KnowledgeBase
+
+kb = KnowledgeBase()
+kb.add("policy", "Refunds are issued within 7 business days.", department="finance")
+kb.add("support", "Priority customers receive 24/7 support.", department="support")
+
+print(kb.search("refund timing", top_k=3))
+print(kb.context("refund timing"))
+```
+
+TigerDataLab's core RAG implementation is intentionally dependency-light. Production deployments can place an embedding/vector database behind the same application boundary without forcing that infrastructure on every user.
+
+## Safe tools / function calling
+
+```python
+from tigerdatalab.ai import Tool, ToolRegistry
+
+registry = ToolRegistry()
+registry.register(Tool(
+    name="get_order",
+    description="Get an order by ID",
+    function=lambda order_id: {"id": order_id, "status": "shipped"},
+    parameters={
+        "type": "object",
+        "properties": {"order_id": {"type": "string"}},
+        "required": ["order_id"],
+    },
+))
+
+print(registry.schemas())
+print(registry.execute("get_order", {"order_id": "ORD-1001"}))
+```
+
+Only explicitly registered tools can execute. Model output is never treated as arbitrary Python or shell code.
+
+## Business workflows
+
+```python
+from tigerdatalab.ai import Workflow, WorkflowStep
+
+workflow = Workflow("order-support")
+workflow.add_step(WorkflowStep("load", lambda s: {"order": {"status": "delayed"}}))
+workflow.add_step(WorkflowStep("decision", lambda s: "escalate" if s["order"]["status"] == "delayed" else "resolve", output_key="decision"))
+
+result = workflow.run({"order_id": "ORD-1001"})
+print(result.status, result.state)
+```
+
+Workflows support ordered steps, conditions, output keys, validation and bounded execution.
+
+## Model routing
+
+```python
+from tigerdatalab.ai import ModelRouter, OpenAIProvider
+
+router = ModelRouter()
+router.add(OpenAIProvider(), "primary-model")
+router.add(OpenAIProvider(), "fallback-model")
+
+response = router.chat([{"role": "user", "content": "Summarize this order."}])
+```
+
+The router tries configured targets in order and falls back when a target fails. Provider credentials remain outside application data.
+
+## Evaluation
+
+```python
+from tigerdatalab.ai import evaluate
+
+records = [
+    {"prompt": "2+2?", "expected": "4"},
 ]
 
-data = AIDataset(rows, task="sft").run()
-
-trainer = LLMTrainer(
-    model="Qwen/Qwen3-0.6B",
-    output_dir="./my-tigerdatalab-model",
-)
-
-trainer.train_sft(data, epochs=1, batch_size=2, learning_rate=2e-5)
+result = evaluate(lambda messages: "4", records)
+print(result.score, result.average_latency_ms)
 ```
 
-Or use the convenience API:
+Evaluation provides pass/fail counts, score, latency and failure details. For production systems, use task-specific scorers and representative test sets rather than relying only on exact-match evaluation.
+
+## Fine-tuning
 
 ```python
-from tigerdatalab.ai import train_sft
+from tigerdatalab.ai import LLMTrainer
 
-train_sft(
-    "training_data/train.jsonl",
-    model="Qwen/Qwen3-0.6B",
-    output_dir="./my-model",
-    epochs=1,
-)
+trainer = LLMTrainer("Qwen/Qwen3-0.6B", "./model")
+trainer.train_sft("training_data/train.jsonl", epochs=1)
 ```
 
-> Model training is performed by the libraries you explicitly install, including PyTorch, Transformers, Hugging Face Datasets and TRL. TigerDataLab provides the data-preparation and training-orchestration layer.
+Install `tigerdatalab[train]` only when needed. Actual training is performed by PyTorch, Transformers, Hugging Face Datasets and TRL. TigerDataLab orchestrates the data and training workflow.
 
-## 🧠 AI training-data workflow
+## Analytics platform
 
-```text
-CSV / Excel / JSON / JSONL / application data
-                    │
-                    ▼
-             TigerDataLab AI
-                    │
-                    ▼
-       format + schema validation
-                    │
-                    ▼
-          PII detection + masking
-                    │
-                    ▼
-             deduplication
-                    │
-                    ▼
-            quality scoring
-                    │
-                    ▼
-       train / validation / test split
-                    │
-                    ▼
-                 JSONL
-                    │
-                    ▼
-       Hugging Face Datasets + TRL
-                    │
-                    ▼
-             causal LM SFT
-                    │
-                    ▼
-           saved fine-tuned model
-```
-
-## Supported AI dataset tasks
-
-| Task | Purpose |
-|---|---|
-| `sft` | Supervised instruction fine-tuning |
-| `chat` | Conversational/chat model datasets |
-| `dpo` | Preference optimization datasets |
-| `classification` | Labelled classification datasets |
-| `text` | Generic text training datasets |
-
-## Public API
-
-### Analytics
+TigerDataLab continues to provide its existing data analytics capabilities:
 
 ```python
+import tigerdatalab as tdl
+
 result = tdl.analyze("sales.xlsx")
-result.summary()
-result.kpis()
-result.quality()
-result.statistics()
-result.trends()
-result.customers()
-result.products()
-result.categories()
-result.insights()
-result.recommendations()
-result.visualize()
-result.growth()
-result.anomalies()
-result.ask()
+print(result.summary())
+print(result.kpis())
+print(result.quality())
+print(result.insights())
 result.dashboard("analysis/dashboard.html")
-result.export("analysis")
 result.report("analysis")
 ```
 
-### AI
-
-```python
-from tigerdatalab.ai import (
-    AIDataset,
-    prepare,
-    LLMTrainer,
-    train_sft,
-    validate_records,
-    mask_record,
-    deterministic_split_records,
-)
-```
-
-## 📊 Large data
-
-For larger datasets, use the DuckDB-backed interface:
+Large data:
 
 ```python
 data = tdl.large("large_sales.parquet")
 data.count()
 data.aggregate("category", "SUM(revenue) AS revenue", "SUM(profit) AS profit")
-data.query("SELECT category, AVG(revenue) FROM data GROUP BY category")
 ```
 
-The large-data query layer refuses destructive SQL operations.
+DataOps remains available for controlled, audited data changes.
 
-## 🔧 DataOps
-
-```python
-data = tdl.open("sales.xlsx")
-data.update(where={"product_id": "SKU-1"}, values={"price": 499})
-data.insert({"product_id": "SKU-99", "product": "Mouse", "price": 399})
-data.delete(where={"product_id": "SKU-99"})
-data.upsert({"product_id": "SKU-1", "price": 509}, key="product_id")
-data.rollback()
-data.save()
-data.save_audit_log("analysis/audit.json")
-```
-
-Writes are controlled and audited. Zero-row updates/deletes raise explicit errors.
-
-## 🖥️ CLI
-
-```bash
-tigerdatalab analyze sales.csv
-tigerdatalab dashboard sales.csv -o analysis/dashboard.html
-tigerdatalab profile sales.csv
-tigerdatalab quality sales.csv
-tigerdatalab clean sales.csv -o cleaned.xlsx
-tigerdatalab report sales.csv -o analysis
-```
-
-## 🔐 Privacy and security
-
-TigerDataLab is designed to be local-first:
-
-- Datasets are not uploaded by the library.
-- Analytics and training-data preparation do not require an external AI API.
-- PII detection and masking run locally before training export.
-- Dataset contents are not interpreted as arbitrary shell commands.
-- The optional training backend uses only the model/data libraries you explicitly install.
-
-Always review automatically detected PII and training data before using a dataset in production.
-
-## 📦 Project layout
+## Architecture
 
 ```text
-tigerdatalab/
-├── core.py
-├── analytics/
-├── quality/
-├── insights/
-├── visualization/
-├── dashboard/
-├── reporting/
-├── dataops/
-├── scale/
-├── ai/
-│   ├── datasets.py       # training-format adapters
-│   ├── pipeline.py       # validation, privacy, dedup and export pipeline
-│   ├── privacy.py        # local PII detection/masking
-│   ├── quality.py        # dataset quality metrics
-│   ├── schema.py         # training schema validation
-│   └── training.py       # optional Hugging Face/TRL fine-tuning
-└── cli/
+                    TigerDataLab
+┌──────────────────────────────────────────────────────┐
+│ Analytics │ Data Quality │ DataOps │ Dashboards      │
+├──────────────────────────────────────────────────────┤
+│ Training Data │ PII │ Lineage │ Fine-tuning         │
+├──────────────────────────────────────────────────────┤
+│ RAG │ Providers │ Tools │ Workflows │ Router        │
+├──────────────────────────────────────────────────────┤
+│ Registry │ Evaluation │ CompanyAI                    │
+└──────────────────────────────────────────────────────┘
+                         │
+                         ▼
+                 Existing AI / LLM
+                         │
+                         ▼
+                  Company workflow
 ```
 
-## 🧪 Testing
+## Public AI API
 
-Run the complete test suite with:
+```python
+from tigerdatalab.ai import (
+    AIDataset, CompanyAI, KnowledgeBase, ModelRouter, OpenAIProvider,
+    Tool, ToolRegistry, Workflow, WorkflowStep, Registry, Asset,
+    Evaluator, evaluate, LLMTrainer, train_sft,
+)
+```
+
+## Security principles
+
+- Local-first data processing by default.
+- No mandatory LLM API for dataset preparation.
+- API credentials are read from environment variables.
+- PII scanning/masking happens locally in the training-data pipeline.
+- Tool execution is explicit and allow-listed.
+- Workflow execution is bounded and deterministic.
+- Training data and model outputs should be reviewed before production use.
+- TigerDataLab does not imply that a hosted proprietary model can be fine-tuned through its API unless that provider explicitly supports it.
+
+## Testing
 
 ```bash
+python -m pip install -e ".[all,dev]"
 python -m pytest -v
 ```
 
-The suite covers the analytics/DataOps/large-data platform and AI training-data functionality including validation, adapters, deterministic splitting, PII masking, deduplication and exports.
-
-## 🛠️ Build and validate locally
+Build validation:
 
 ```bash
 python -m pip install --upgrade build twine
@@ -298,32 +292,39 @@ python -m build
 python -m twine check dist/*
 ```
 
-## 🚢 Release v3.0.7
+## Release
 
-Version **3.0.7** is the release target for the current package metadata. The repository is configured around GitHub Actions and PyPI Trusted Publishing/OIDC for release automation.
+The repository uses GitHub Actions and PyPI Trusted Publishing/OIDC. A **published GitHub Release** triggers tests, package build, metadata validation and PyPI publishing.
 
-Recommended release flow:
+For v3.1.0:
 
 ```text
-main
-  │
-  ├── tests
-  ├── build package
-  ├── validate metadata
-  └── publish release → PyPI Trusted Publishing/OIDC
+main → CI → GitHub Release v3.1.0 → publish workflow → PyPI
 ```
 
-After the GitHub release workflow completes, verify the published package with:
+## Project layout
 
-```bash
-python -m pip install --upgrade tigerdatalab
-python -c "import tigerdatalab; print(tigerdatalab.__version__)"
+```text
+tigerdatalab/
+├── analytics/ quality/ insights/ visualization/
+├── dashboard/ reporting/ dataops/ scale/
+├── ai/
+│   ├── datasets.py
+│   ├── pipeline.py
+│   ├── privacy.py
+│   ├── quality.py
+│   ├── schema.py
+│   ├── training.py
+│   ├── providers.py
+│   ├── rag.py
+│   ├── evaluation.py
+│   ├── tools.py
+│   ├── workflows.py
+│   ├── router.py
+│   ├── registry.py
+│   └── system.py
+└── cli/
 ```
-
-## 📚 Links
-
-- GitHub: https://github.com/abhi15724/tigerdatalab
-- PyPI: https://pypi.org/project/tigerdatalab/
 
 ## License
 
