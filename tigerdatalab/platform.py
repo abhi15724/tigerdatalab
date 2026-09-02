@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 from .core import analyze
-from .ai import AIDataset, CompanyAI, Document, KnowledgeBase, ModelRouter, UniversalTrainer
+from .ai import AIDataset, CompanyAI, CompanyAgent, Document, KnowledgeBase, ModelRouter, UniversalTrainer
 from .ai.providers import Provider
 
 
@@ -152,6 +152,7 @@ class TigerDataLab:
     def analyze(self, source: str | Path): return analyze(source)
     def ai_training(self, name: str, task: str = "sft") -> AIProject: return AIProject(name=name, task=task)
     def company_ai(self, name: str) -> CompanyAIProject: return CompanyAIProject(name=name)
+    def company_agent(self, name: str) -> CompanyAgent: return CompanyAgent(name=name)
 
 
 def create_project(name: str = "default") -> TigerDataLab:
