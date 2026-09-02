@@ -981,7 +981,7 @@ agent.add_knowledge(
 )
 ```
 
-## ## 9.4 Connect a Model
+##  9.4 Connect a Model
 
 TigerDataLab is **provider-agnostic**. You are not limited to OpenAI.
 
