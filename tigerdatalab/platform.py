@@ -1,14 +1,14 @@
 """Unified production-oriented Data-to-AI platform facade.
 
-This module composes TigerDataLab's existing analytics, DataOps and AI layers
-without forcing users to learn five different APIs. It deliberately keeps
-provider credentials and business data out of project metadata.
+This module composes TigerDataLab's analytics, DataOps and AI layers into one
+project API. Credentials and business data are intentionally not persisted by
+this facade.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, Callable
 import json
 
 import numpy as np
@@ -16,6 +16,7 @@ import pandas as pd
 
 from .core import analyze
 from .ai import AIDataset, CompanyAI, KnowledgeBase, ModelRouter, UniversalTrainer
+from .ai.providers import Provider
 
 
 @dataclass(frozen=True)
@@ -30,12 +31,14 @@ class DatasetProfile:
 
 @dataclass
 class DataPipeline:
-    """Small deterministic ETL pipeline suitable for local/CI execution."""
+    """Deterministic ETL pipeline suitable for local or CI execution."""
     steps: list[tuple[str, Callable[[pd.DataFrame], pd.DataFrame]]] = field(default_factory=list)
 
     def add(self, name: str, transform: Callable[[pd.DataFrame], pd.DataFrame]) -> "DataPipeline":
         if not name.strip():
             raise ValueError("step name cannot be empty")
+        if not callable(transform):
+            raise TypeError("transform must be callable")
         self.steps.append((name, transform))
         return self
 
@@ -49,11 +52,13 @@ class DataPipeline:
         return current
 
     def save_manifest(self, path: str | Path) -> None:
-        Path(path).write_text(json.dumps({"steps": [name for name, _ in self.steps]}, indent=2), encoding="utf-8")
+        Path(path).write_text(
+            json.dumps({"steps": [name for name, _ in self.steps]}, indent=2), encoding="utf-8"
+        )
 
 
 class DataScience:
-    """Dependency-light data-science helpers with deterministic outputs."""
+    """Dependency-light data-science helpers with reproducible behavior."""
 
     @staticmethod
     def profile(frame: pd.DataFrame) -> DatasetProfile:
@@ -85,7 +90,7 @@ class DataScience:
 
 @dataclass
 class AIProject:
-    """Unified general-AI training project."""
+    """General AI training project backed by TigerDataLab's training layer."""
     name: str
     task: str = "sft"
 
@@ -101,14 +106,21 @@ class AIProject:
 
 @dataclass
 class CompanyAIProject:
-    """Blueprint for company-specific AI: knowledge, workflow and model."""
+    """Company AI project combining knowledge, provider model and workflow."""
     name: str
     ai: CompanyAI | None = None
     knowledge_base: KnowledgeBase = field(default_factory=KnowledgeBase)
     workflow: Any = None
 
     def add_knowledge(self, source: str, text: str, **metadata: Any) -> "CompanyAIProject":
-        self.knowledge_base.add(source, text, **metadata)
+        self.knowledge_base.add(__import__("tigerdatalab.ai", fromlist=["Document"]).Document(source, text, {k: str(v) for k, v in metadata.items()}))
+        return self
+
+    def connect(self, provider: Provider, model: str, *, system: str | None = None) -> "CompanyAIProject":
+        router = ModelRouter()
+        router.add(provider, model)
+        self.ai = CompanyAI(router, knowledge_base=self.knowledge_base, workflow=self.workflow)
+        self._system = system
         return self
 
     def attach(self, ai: CompanyAI) -> "CompanyAIProject":
@@ -117,12 +129,20 @@ class CompanyAIProject:
 
     def ask(self, prompt: str, **kwargs: Any):
         if self.ai is None:
-            raise ValueError("Attach a configured CompanyAI before asking questions")
+            raise ValueError("Connect or attach a CompanyAI before asking questions")
+        system = getattr(self, "_system", None)
+        if system is not None and "system" not in kwargs:
+            kwargs["system"] = system
         return self.ai.ask(prompt, **kwargs)
+
+    def run(self, inputs: dict[str, Any] | None = None):
+        if self.ai is None:
+            raise ValueError("Connect or attach a CompanyAI before running the workflow")
+        return self.ai.run(inputs)
 
 
 class TigerDataLab:
-    """Single entry point for analytics, engineering, data science and AI."""
+    """Single entry point for data analytics, engineering, data science and AI."""
 
     def __init__(self, project: str = "default") -> None:
         if not project.strip():
