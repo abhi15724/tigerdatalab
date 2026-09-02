@@ -53,6 +53,37 @@ def chunk_text(text: str, chunk_size: int = 800, overlap: int = 100) -> list[str
     return chunks
 
 
+_STOP_WORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "by", "do", "for", "from",
+    "how", "in", "is", "it", "of", "on", "or", "that", "the", "this", "to",
+    "was", "what", "when", "where", "which", "who", "why", "with",
+}
+
+
+def _normalize_term(term: str) -> str:
+    """Apply small deterministic English morphology normalization."""
+    term = term.lower().strip()
+    if len(term) > 5 and term.endswith("ies"):
+        return term[:-3] + "y"
+    if len(term) > 5 and term.endswith("ied"):
+        return term[:-3] + "y"
+    if len(term) > 5 and term.endswith("ed"):
+        return term[:-2]
+    if len(term) > 5 and term.endswith("ing"):
+        return term[:-3]
+    if len(term) > 4 and term.endswith("s") and not term.endswith("ss"):
+        return term[:-1]
+    return term
+
+
+def _terms(text: str) -> set[str]:
+    return {
+        _normalize_term(token)
+        for token in re.findall(r"[a-z0-9_]+", text.lower())
+        if len(token) > 1 and token not in _STOP_WORDS
+    }
+
+
 class KnowledgeBase:
     """In-memory knowledge base with deterministic lexical retrieval."""
 
@@ -71,16 +102,15 @@ class KnowledgeBase:
     def search(self, query: str, top_k: int = 5) -> list[tuple[Chunk, float]]:
         if top_k <= 0:
             return []
-        terms = {t for t in re.findall(r"[a-z0-9_]+", query.lower()) if len(t) > 1}
+        terms = _terms(query)
         if not terms:
             return []
         ranked: list[tuple[Chunk, float]] = []
         for chunk in self.chunks:
-            words = re.findall(r"[a-z0-9_]+", chunk.text.lower())
+            words = _terms(chunk.text)
             if not words:
                 continue
-            unique = set(words)
-            score = sum(1 for term in terms if term in unique) / len(terms)
+            score = sum(1 for term in terms if term in words) / len(terms)
             if score:
                 ranked.append((chunk, score))
         ranked.sort(key=lambda item: (-item[1], item[0].id))
