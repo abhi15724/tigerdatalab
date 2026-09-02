@@ -74,9 +74,6 @@ class AIDataset:
             if not item:
                 rejected += 1
                 continue
-            item, found = mask_record(item)
-            for kind, count in found.items():
-                pii[kind] = pii.get(kind, 0) + count
             text_size = sum(len(v) for v in _string_values(item))
             if text_size < min_chars:
                 too_short += 1
@@ -86,7 +83,17 @@ class AIDataset:
                 continue
             records.append(item)
 
+        # Deduplicate before masking so repeated source examples do not inflate
+        # privacy statistics and so the fingerprint remains based on source data.
         records, duplicates = deduplicate(records)
+        masked_records: list[dict[str, Any]] = []
+        for item in records:
+            masked, found = mask_record(item)
+            masked_records.append(masked)
+            for kind, count in found.items():
+                pii[kind] = pii.get(kind, 0) + count
+        records = masked_records
+
         self.validation = validate_records(records, self.task)
         invalid = {issue.index for issue in self.validation.issues}
         if invalid:
@@ -149,7 +156,7 @@ class AIDataset:
         lineage = {
             "source": self.source,
             "task": self.task,
-            "pipeline": ["ingest", "format", "pii_mask", "deduplicate", "validate", "quality", "split", "export"],
+            "pipeline": ["ingest", "format", "deduplicate", "pii_mask", "validate", "quality", "split", "export"],
             "split_strategy": split_strategy,
             "stats": self.stats,
         }
