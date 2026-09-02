@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
-from .datasets import to_sft
 from .evaluation import EvaluationResult, Evaluator
 from .pipeline import AIDataset
 from .providers import Provider
@@ -21,15 +20,9 @@ from .workflows import Workflow, WorkflowResult
 class CompanyAgent:
     """High-level facade for building a company-specific AI agent.
 
-    The agent combines five controlled layers:
-    - training data preparation and optional model fine-tuning;
-    - company knowledge retrieval (RAG);
-    - explicitly allow-listed tools;
-    - deterministic company workflows;
-    - evaluation of the resulting AI behavior.
-
-    Weight training is delegated to TigerDataLab's configured training backend.
-    Runtime model calls are delegated to the configured provider/router.
+    Combines five controlled layers: training-data preparation and optional
+    model fine-tuning, company knowledge retrieval, explicitly allow-listed
+    tools, deterministic workflows, and evaluation.
     """
 
     name: str
@@ -48,22 +41,14 @@ class CompanyAgent:
         *,
         task: str = "sft",
         output_dir: str | Path | None = None,
-        pii: bool = True,
-        deduplicate_records: bool = True,
         min_chars: int = 1,
         max_chars: int | None = None,
-        seed: int = 42,
     ) -> AIDataset:
-        """Prepare trusted company training data and optionally export artifacts."""
-        dataset = AIDataset(
-            source,
-            task=task,
-            pii=pii,
-            deduplicate=deduplicate_records,
+        """Prepare privacy-aware, validated and deduplicated company data."""
+        dataset = AIDataset(source, task=task).run(
             min_chars=min_chars,
             max_chars=max_chars,
-            seed=seed,
-        ).run()
+        )
         if output_dir is not None:
             dataset.export(output_dir)
         self.training_dataset = dataset
@@ -88,7 +73,7 @@ class CompanyAgent:
         return self.training_result
 
     def add_knowledge(self, source: str, text: str, **metadata: Any) -> "CompanyAgent":
-        """Add current company knowledge for retrieval without retraining the model."""
+        """Add current company knowledge for retrieval without retraining."""
         if not text or not text.strip():
             raise ValueError("knowledge text cannot be empty")
         self.knowledge_base.add(
@@ -142,7 +127,7 @@ class CompanyAgent:
         return self
 
     def ask(self, prompt: str, **kwargs: Any) -> AIResult:
-        """Ask the connected company AI using knowledge and registered tools."""
+        """Ask the connected company AI using company context and tools."""
         if self.ai is None:
             raise ValueError("Connect or attach a CompanyAI before asking questions")
         if self._system is not None and "system" not in kwargs:
@@ -163,9 +148,8 @@ class CompanyAgent:
 
     @property
     def ready(self) -> bool:
-        """Whether a runtime model is connected and the project can answer."""
+        """Whether a runtime model is connected."""
         return self.ai is not None
 
 
-# Backward-friendly descriptive alias for applications that prefer Project naming.
 CompanyAgentProject = CompanyAgent
