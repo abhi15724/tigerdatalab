@@ -37,15 +37,22 @@ class PIIScanner:
         return text, counts
 
 def mask_record(record: dict[str, Any]) -> tuple[dict[str, Any], dict[str, int]]:
-    masked: dict[str, Any] = {}
+    """Recursively mask PII in nested training records."""
     counts: dict[str, int] = {}
     scanner = PIIScanner()
-    for key, value in record.items():
+
+    def transform(value: Any) -> Any:
         if isinstance(value, str):
             new_value, found = scanner.mask(value)
-            masked[key] = new_value
             for kind, count in found.items():
                 counts[kind] = counts.get(kind, 0) + count
-        else:
-            masked[key] = value
-    return masked, counts
+            return new_value
+        if isinstance(value, dict):
+            return {key: transform(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [transform(item) for item in value]
+        if isinstance(value, tuple):
+            return tuple(transform(item) for item in value)
+        return value
+
+    return transform(record), counts
