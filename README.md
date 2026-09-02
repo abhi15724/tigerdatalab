@@ -842,6 +842,8 @@ Other built-in provider adapters include:
 - OpenRouter
 - Mistral
 - Together
+- Your custom
+  
 
 Credentials are read from supported environment variables or can be passed explicitly through the provider configuration.
 
