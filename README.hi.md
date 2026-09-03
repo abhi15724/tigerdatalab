@@ -177,3 +177,5 @@ TigerDataLab यह दावा नहीं करता कि हर proprie
 ## पूरी documentation
 
 English documentation के लिए [README.md](README.md) देखें।
+
+[![PyPI](https://img.shields.io/pypi/v/tigerdatalab.svg?style=for-the-badge&logo=pypi&logoColor=white&cacheSeconds=60)](https://pypi.org/project/tigerdatalab/)
