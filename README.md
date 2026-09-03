@@ -10,6 +10,7 @@
 
 <p>
   <a href="https://pypi.org/project/tigerdatalab/"><img src="https://img.shields.io/pypi/v/tigerdatalab.svg?style=for-the-badge&logo=pypi&logoColor=white" alt="PyPI version"></a>
+  <a href="https://img.shields.io/pypi/dm/tigerdatalab.svg"><img src="https://img.shields.io/pypi/dm/tigerdatalab.svg?style=for-the-badge&logo=pypi&logoColor=white" alt="PyPI downloads"></a>
   <a href="https://pypi.org/project/tigerdatalab/"><img src="https://img.shields.io/pypi/pyversions/tigerdatalab?style=for-the-badge&logo=python&logoColor=white" alt="Python versions"></a>
   <a href="https://github.com/abhi15724/tigerdatalab/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/abhi15724/tigerdatalab/ci.yml?style=for-the-badge&logo=github&label=CI" alt="CI"></a>
   <a href="https://github.com/abhi15724/tigerdatalab/blob/main/LICENSE"><img src="https://img.shields.io/github/license/abhi15724/tigerdatalab?style=for-the-badge" alt="License"></a>
@@ -82,6 +83,45 @@ python -m pip install "tigerdatalab[train]"
 ```
 
 The training extra includes the optional Hugging Face/Transformers/TRL/PEFT ecosystem. Pin and test dependency versions in production environments.
+
+---
+
+# Output Formats
+
+TigerDataLab returns structured Python objects during interactive workflows and writes standard machine-readable artifacts for automated pipelines.
+
+| Operation | Output format | Typical output |
+|---|---|---|
+| Data loading / analysis | Python objects / DataFrames | `DataFrame`, profile and analysis result objects |
+| Data cleaning | CSV / Excel | `.csv`, `.xlsx` |
+| Data engineering | DataFrame + JSON | transformed `DataFrame`, `pipeline_manifest.json` |
+| AI training data | JSONL | `train.jsonl`, `validation.jsonl`, `test.jsonl` |
+| Dataset quality | JSON | `quality_report.json` |
+| Dataset lineage | JSON | `lineage.json` |
+| Dataset documentation | Markdown | `dataset_card.md` |
+| Model evaluation | JSON | `evaluation_report.json` |
+| Run metadata | JSON | `run_manifest.json` |
+| Reports / dashboards | PDF / HTML | business reports and dashboard artifacts |
+| Company AI / RAG | Python result objects | answer/output and retrieved context |
+| Model training | Model/backend-specific | model or adapter artifacts |
+
+### Common AI training output
+
+```text
+./artifacts/<run-name>/
+├── train.jsonl
+├── validation.jsonl
+├── test.jsonl
+├── quality_report.json
+├── lineage.json
+├── dataset_card.md
+├── evaluation_report.json
+├── run_manifest.json
+└── model/
+    └── model or adapter artifacts
+```
+
+JSONL is used for training datasets because it stores one training example per line and works well with streaming, validation and common LLM training pipelines. The exact schema depends on the selected task or adapter.
 
 ---
 
@@ -250,7 +290,7 @@ Deterministic train/validation/test split
 
 # 6. Complete AI/LLM Training Pipeline
 
-The new end-to-end API directly maps to the six stages:
+The end-to-end API directly maps to the six stages:
 
 ```text
 clean_data()
@@ -280,23 +320,15 @@ ai = project.ai_training(
     output_dir="./artifacts/acme-support",
 )
 
-# 1. Clean and prepare
 ai.clean_data()
-
-# 2. Validate
 validation = ai.validate_data()
-
-# 3. Explicitly select SFT format
 ai.convert_to_sft()
-
-# 4. Reproducible 80/10/10 split
 splits = ai.split_dataset(
     train_ratio=0.8,
     validation_ratio=0.1,
     strategy="hash",
 )
 
-# 5. Fine-tune a compatible open model
 ai.train_model(
     model="Qwen/Qwen3-0.6B",
     method="lora",
@@ -305,16 +337,12 @@ ai.train_model(
     learning_rate=1e-4,
 )
 
-# 6. Evaluate a model callable
-# Replace this with your actual local model, API or inference endpoint.
 def model(prompt: str) -> str:
     return "your model response"
 
 result = ai.evaluate_model(model)
 print("Score:", result.score)
 print("Latency:", result.average_latency_ms)
-
-# 7. Write run metadata
 print(ai.export_run_manifest())
 ```
 
@@ -333,47 +361,6 @@ artifacts/acme-support/
 ```
 
 The training backend writes model artifacts under the configured model output directory. Exact files depend on the model and backend.
-
----
-
-## Output Formats
-
-TigerDataLab produces different output formats depending on the operation. This makes the package useful both interactively and inside automated data/AI pipelines.
-
-| Operation | Output format | Typical output |
-|---|---|---|
-| Data loading / analysis | Python objects / DataFrames | `DataFrame`, profile and analysis result objects |
-| Data cleaning | CSV / Excel | `.csv`, `.xlsx` cleaned datasets |
-| Data engineering | DataFrame + JSON | transformed `DataFrame`, `pipeline_manifest.json` |
-| AI training data | JSONL | `train.jsonl`, `validation.jsonl`, `test.jsonl` |
-| Dataset quality | JSON | `quality_report.json` |
-| Dataset lineage | JSON | `lineage.json` |
-| Dataset documentation | Markdown | `dataset_card.md` |
-| Model evaluation | JSON | `evaluation_report.json` |
-| Run metadata | JSON | `run_manifest.json` |
-| Reports | PDF / HTML | analysis and business reports / dashboards |
-| Company AI / RAG | Python result objects | answer/output and retrieved context |
-| Training model artifacts | Model/backend-specific | model or adapter files under the configured output directory |
-
-### Common AI training output
-
-```text
-./artifacts/<run-name>/
-├── train.jsonl
-├── validation.jsonl
-├── test.jsonl
-├── quality_report.json
-├── lineage.json
-├── dataset_card.md
-├── evaluation_report.json
-├── run_manifest.json
-└── model/
-    └── model or adapter artifacts
-```
-
-### Why JSONL for training data?
-
-JSONL stores one training example per line, which is convenient for streaming, validation, dataset inspection and common LLM training pipelines. The exact record schema depends on the selected task/adapter such as SFT, instruction, DPO or classification.
 
 ---
 
@@ -624,7 +611,6 @@ TigerDataLab does not force every organization to use the built-in Transformers 
 from tigerdatalab.ai import CallableTrainingBackend, TrainingCapabilities
 
 def enterprise_train(request):
-    # Submit request to your organization's training platform.
     return {"status": "submitted", "model": request.model}
 
 backend = CallableTrainingBackend(
