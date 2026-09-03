@@ -68,7 +68,7 @@ def create_app(
     compatibility; internet-facing deployments should always configure one.
     """
     try:
-        from fastapi import Body, FastAPI, HTTPException, Request
+        from fastapi import Body, FastAPI, HTTPException
     except ImportError as exc:
         raise DeploymentError(
             "FastAPI is required for deployment. Install with: "
@@ -94,16 +94,23 @@ def create_app(
     buckets: dict[str, deque[float]] = {}
     lock = threading.Lock()
 
-    def guard(request: Request) -> str:
-        """Authenticate and rate-limit a request without relying on FastAPI header injection."""
+    def guard(request: Any) -> str:
+        """Authenticate and rate-limit a request.
+
+        ``request`` deliberately uses ``Any`` here because FastAPI resolves
+        endpoint annotations when routes are registered. ``Request`` is imported
+        lazily inside ``create_app`` for the optional deployment dependency;
+        annotating nested endpoint functions with that local type makes FastAPI
+        treat it as a request/query parameter under postponed annotations.
+        """
         identity = _client_id(request)
         authorization = request.headers.get("authorization")
         if auth_required:
             expected = f"Bearer {configured_key}"
             if (
                 not authorization
-                or not hashlib.sha256(authorization.encode()).digest()
-                == hashlib.sha256(expected.encode()).digest()
+                or hashlib.sha256(authorization.encode()).digest()
+                != hashlib.sha256(expected.encode()).digest()
             ):
                 audit.record(
                     {
@@ -146,7 +153,7 @@ def create_app(
 
     @app.post("/v1/ask")
     def ask(
-        request: Request,
+        request: Any,
         payload: Mapping[str, Any] = Body(...),
     ) -> dict[str, Any]:
         identity = guard(request)
@@ -173,7 +180,7 @@ def create_app(
 
     @app.post("/v1/run")
     def run(
-        request: Request,
+        request: Any,
         payload: Mapping[str, Any] | None = Body(default=None),
     ) -> Any:
         identity = guard(request)
@@ -189,7 +196,7 @@ def create_app(
         return result
 
     @app.get("/v1/audit")
-    def audit_events(request: Request) -> list[dict[str, Any]]:
+    def audit_events(request: Any) -> list[dict[str, Any]]:
         guard(request)
         if not hasattr(audit, "events"):
             raise HTTPException(status_code=501, detail="audit sink does not support reading events")
