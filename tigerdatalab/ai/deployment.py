@@ -9,6 +9,14 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+try:
+    # FastAPI is an optional deployment dependency. Importing Request at module
+    # scope is intentional: FastAPI resolves postponed endpoint annotations
+    # from the function's global namespace, not the local scope of create_app().
+    from fastapi import Request
+except ImportError:  # pragma: no cover - exercised only without FastAPI installed
+    Request = Any  # type: ignore[misc,assignment]
+
 
 class DeploymentError(RuntimeError):
     """Raised when an agent cannot be deployed."""
@@ -94,15 +102,8 @@ def create_app(
     buckets: dict[str, deque[float]] = {}
     lock = threading.Lock()
 
-    def guard(request: Any) -> str:
-        """Authenticate and rate-limit a request.
-
-        ``request`` deliberately uses ``Any`` here because FastAPI resolves
-        endpoint annotations when routes are registered. ``Request`` is imported
-        lazily inside ``create_app`` for the optional deployment dependency;
-        annotating nested endpoint functions with that local type makes FastAPI
-        treat it as a request/query parameter under postponed annotations.
-        """
+    def guard(request: Request) -> str:
+        """Authenticate and rate-limit a request."""
         identity = _client_id(request)
         authorization = request.headers.get("authorization")
         if auth_required:
@@ -153,7 +154,7 @@ def create_app(
 
     @app.post("/v1/ask")
     def ask(
-        request: Any,
+        request: Request,
         payload: Mapping[str, Any] = Body(...),
     ) -> dict[str, Any]:
         identity = guard(request)
@@ -180,7 +181,7 @@ def create_app(
 
     @app.post("/v1/run")
     def run(
-        request: Any,
+        request: Request,
         payload: Mapping[str, Any] | None = Body(default=None),
     ) -> Any:
         identity = guard(request)
@@ -196,7 +197,7 @@ def create_app(
         return result
 
     @app.get("/v1/audit")
-    def audit_events(request: Any) -> list[dict[str, Any]]:
+    def audit_events(request: Request) -> list[dict[str, Any]]:
         guard(request)
         if not hasattr(audit, "events"):
             raise HTTPException(status_code=501, detail="audit sink does not support reading events")
