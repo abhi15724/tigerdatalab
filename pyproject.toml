@@ -36,7 +36,7 @@ pdf = ["reportlab>=4.0"]
 train = ["datasets>=2.18", "transformers>=4.40", "trl>=0.8", "accelerate>=0.27", "torch>=2.1", "peft>=0.10"]
 deployment = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
 all = ["duckdb>=0.10", "pyarrow>=14.0", "reportlab>=4.0", "fastapi>=0.110", "uvicorn[standard]>=0.29"]
-dev = ["pytest>=7.4", "pytest-cov>=4.1"]
+dev = ["pytest>=7.4", "pytest-cov>=4.1", "httpx2"]
 
 [project.urls]
 Homepage = "https://github.com/abhi15724/tigerdatalab"
