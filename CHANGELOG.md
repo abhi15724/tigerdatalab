@@ -1,5 +1,15 @@
 # Changelog
 
+## 4.1.1
+- Fixed FastAPI deployment request handling that could incorrectly return HTTP 422 for `/v1/ask` and protected endpoints.
+- Fixed authentication handling so missing or invalid API keys return the intended HTTP 401 response instead of validation errors.
+- Preserved request auditing and rate-limit behavior for deployment endpoints.
+- Optimized GitHub Actions CI to avoid installing heavyweight AI training dependencies for the standard test matrix.
+- Added pip dependency caching to speed up CI and release validation.
+- Optimized the PyPI publishing workflow to use the same lightweight test dependencies.
+- Changed PyPI publishing to run only for published GitHub Releases, preventing an ordinary `pyproject.toml` version bump from publishing accidentally.
+- Preserved backward-compatible public APIs.
+
 ## 4.0.0
 - Added the unified `TigerDataLab` Data-to-AI platform facade for Data Analytics, Data Science, Data Engineering, AI Training and Company AI workflow applications.
 - Added `DataPipeline` for deterministic, testable ETL transformations and pipeline manifests.
