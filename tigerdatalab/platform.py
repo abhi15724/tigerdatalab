@@ -11,6 +11,7 @@ import pandas as pd
 
 from .core import analyze
 from .ai import AIDataset, CompanyAI, CompanyAgent, Document, KnowledgeBase, ModelRouter, UniversalTrainer
+from .ai.end_to_end import AITrainingProject
 from .ai.providers import Provider
 
 
@@ -150,7 +151,26 @@ class TigerDataLab:
 
     def profile(self, frame: pd.DataFrame) -> DatasetProfile: return self.data_science.profile(frame)
     def analyze(self, source: str | Path): return analyze(source)
-    def ai_training(self, name: str, task: str = "sft") -> AIProject: return AIProject(name=name, task=task)
+
+    def ai_training(
+        self,
+        name: str,
+        task: str = "sft",
+        source: str | Path | list[dict[str, Any]] | None = None,
+        *,
+        output_dir: str | Path = "./tigerdatalab-run",
+    ) -> AIProject | AITrainingProject:
+        """Create an AI project; pass ``source`` for the full lifecycle API.
+
+        Without ``source`` this preserves the legacy ``AIProject`` behavior.
+        With ``source``, the returned :class:`AITrainingProject` exposes
+        ``clean_data()``, ``validate_data()``, ``convert_to_sft()``,
+        ``split_dataset()``, ``train_model()`` and ``evaluate_model()``.
+        """
+        if source is None:
+            return AIProject(name=name, task=task)
+        return AITrainingProject(name, source, output_dir=output_dir, task=task)
+
     def company_ai(self, name: str) -> CompanyAIProject: return CompanyAIProject(name=name)
     def company_agent(self, name: str) -> CompanyAgent: return CompanyAgent(name=name)
 
