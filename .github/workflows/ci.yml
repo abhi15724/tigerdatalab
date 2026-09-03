@@ -6,9 +6,6 @@ on:
   pull_request:
     branches: ["main"]
 
-permissions:
-  contents: write
-
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -38,26 +35,3 @@ jobs:
       - name: Smoke-test the CLI
         run: |
           tigerdatalab analyze tests/data/sales.csv
-
-      - name: Update PyPI downloads badge
-        if: ${{ github.event_name == 'push' && matrix.python-version == '3.12' }}
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('README.md')
-          s = p.read_text(encoding='utf-8')
-          old = '<a href="https://img.shields.io/pypi/dm/tigerdatalab.svg"><img src="https://img.shields.io/pypi/dm/tigerdatalab.svg?style=for-the-badge&logo=pypi&logoColor=white" alt="PyPI downloads"></a>'
-          new = '<a href="https://pepy.tech/project/tigerdatalab"><img src="https://api.pepy.tech/badge/tigerdatalab/month?style=for-the-badge&logo=pypi&logoColor=white" alt="PyPI monthly downloads"></a>'
-          if old not in s:
-              raise SystemExit(0)
-          p.write_text(s.replace(old, new, 1), encoding='utf-8')
-          PY
-          if git diff --quiet -- README.md; then
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add README.md
-          git commit -m 'Update README PyPI download badge'
-          git push
