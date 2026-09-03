@@ -1,10 +1,6 @@
 name: Publish TigerDataLab to PyPI
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "pyproject.toml"
   release:
     types: [published]
 
@@ -26,10 +22,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install package and test dependencies
+          cache: pip
+      - name: Install package and CI dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[all,dev]"
+          python -m pip install -e ".[dev,deployment,pdf,large]"
       - name: Run tests
         run: python -m pytest -v
 
@@ -44,6 +41,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
       - name: Install build tools
         run: python -m pip install --upgrade build twine
       - name: Build package
