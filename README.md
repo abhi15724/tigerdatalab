@@ -9,7 +9,7 @@
 > **Don’t replace your AI. Teach it your data, your rules, and your workflow.**
 
 <p>
-  <a href="https://pypi.org/project/tigerdatalab/"><img src="https://img.shields.io/pypi/v/tigerdatalab.svg?style=for-the-badge&logo=pypi&logoColor=white" alt="PyPI version"></a>
+  <a href="https://pypi.org/project/tigerdatalab/"><img src="https://img.shields.io/pypi/v/tigerdatalab.svg?style=for-the-badge&logo=pypi&logoColor=white&cacheSeconds=60" alt="PyPI version"></a>
   <a href="https://pepy.tech/project/tigerdatalab"><img src="https://api.pepy.tech/badge/tigerdatalab/month?style=for-the-badge&logo=pypi&logoColor=white" alt="PyPI monthly downloads"></a>
   <a href="https://pypi.org/project/tigerdatalab/"><img src="https://img.shields.io/pypi/pyversions/tigerdatalab?style=for-the-badge&logo=python&logoColor=white" alt="Python versions"></a>
   <a href="https://github.com/abhi15724/tigerdatalab/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/abhi15724/tigerdatalab/ci.yml?style=for-the-badge&logo=github&label=CI" alt="CI"></a>
