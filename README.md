@@ -15,7 +15,7 @@
   <a href="https://github.com/abhi15724/tigerdatalab/blob/main/LICENSE"><img src="https://img.shields.io/github/license/abhi15724/tigerdatalab?style=for-the-badge" alt="License"></a>
 </p>
 
-**v4.1.0 • Python 3.10–3.13**
+**v4.1.1 • Python 3.10–3.13**
 
 [English README](README.md) · [हिंदी README](README.hi.md)
 
@@ -333,6 +333,47 @@ artifacts/acme-support/
 ```
 
 The training backend writes model artifacts under the configured model output directory. Exact files depend on the model and backend.
+
+---
+
+## Output Formats
+
+TigerDataLab produces different output formats depending on the operation. This makes the package useful both interactively and inside automated data/AI pipelines.
+
+| Operation | Output format | Typical output |
+|---|---|---|
+| Data loading / analysis | Python objects / DataFrames | `DataFrame`, profile and analysis result objects |
+| Data cleaning | CSV / Excel | `.csv`, `.xlsx` cleaned datasets |
+| Data engineering | DataFrame + JSON | transformed `DataFrame`, `pipeline_manifest.json` |
+| AI training data | JSONL | `train.jsonl`, `validation.jsonl`, `test.jsonl` |
+| Dataset quality | JSON | `quality_report.json` |
+| Dataset lineage | JSON | `lineage.json` |
+| Dataset documentation | Markdown | `dataset_card.md` |
+| Model evaluation | JSON | `evaluation_report.json` |
+| Run metadata | JSON | `run_manifest.json` |
+| Reports | PDF / HTML | analysis and business reports / dashboards |
+| Company AI / RAG | Python result objects | answer/output and retrieved context |
+| Training model artifacts | Model/backend-specific | model or adapter files under the configured output directory |
+
+### Common AI training output
+
+```text
+./artifacts/<run-name>/
+├── train.jsonl
+├── validation.jsonl
+├── test.jsonl
+├── quality_report.json
+├── lineage.json
+├── dataset_card.md
+├── evaluation_report.json
+├── run_manifest.json
+└── model/
+    └── model or adapter artifacts
+```
+
+### Why JSONL for training data?
+
+JSONL stores one training example per line, which is convenient for streaming, validation, dataset inspection and common LLM training pipelines. The exact record schema depends on the selected task/adapter such as SFT, instruction, DPO or classification.
 
 ---
 
