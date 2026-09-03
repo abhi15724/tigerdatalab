@@ -3,6 +3,7 @@ from .datasets import deterministic_split_records, split_records, to_classificat
 from .dedup import deduplicate, fingerprint
 from .evaluation import EvaluationResult, Evaluator, evaluate
 from .pipeline import AIDataset, prepare
+from .end_to_end import AITrainingProject, AITrainingRun
 from .privacy import PIIFinding, PIIScanner, mask_record
 from .providers import (
     AIResponse,
@@ -42,7 +43,7 @@ from .training import (
 from .workflows import Workflow, WorkflowError, WorkflowResult, WorkflowStep, step
 
 __all__ = [
-    "AIDataset", "prepare", "LLMTrainer", "UniversalTrainer", "train_sft",
+    "AIDataset", "prepare", "AITrainingProject", "AITrainingRun", "LLMTrainer", "UniversalTrainer", "train_sft",
     "TrainingBackend", "TrainingCapabilities", "TrainingRequest", "TrainingError",
     "TrainingDependencyError", "TransformersSFTBackend", "CallableTrainingBackend",
     "register_training_backend", "PIIScanner", "PIIFinding", "mask_record", "to_sft",
