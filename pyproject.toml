@@ -10,7 +10,7 @@ readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
 authors = [{ name = "Abhi" }]
-keywords = ["data-analysis", "data-science", "data-engineering", "business-intelligence", "dataops", "etl", "dashboard", "llm", "rag", "ai-agents", "workflows", "training-data", "fine-tuning", "model-agnostic", "evaluation", "company-ai"]
+keywords = ["data-analysis", "data-science", "data-engineering", "business-intelligence", "dataops", "etl", "dashboard", "llm", "rag", "ai-agents", "workflows", "training-data", "fine-tuning", "model-agnostic", "evaluation", "company-ai", "deployment"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
@@ -34,7 +34,8 @@ dependencies = [
 large = ["duckdb>=0.10", "pyarrow>=14.0"]
 pdf = ["reportlab>=4.0"]
 train = ["datasets>=2.18", "transformers>=4.40", "trl>=0.8", "accelerate>=0.27", "torch>=2.1", "peft>=0.10"]
-all = ["duckdb>=0.10", "pyarrow>=14.0", "reportlab>=4.0"]
+deployment = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
+all = ["duckdb>=0.10", "pyarrow>=14.0", "reportlab>=4.0", "fastapi>=0.110", "uvicorn[standard]>=0.29"]
 dev = ["pytest>=7.4", "pytest-cov>=4.1"]
 
 [project.urls]
