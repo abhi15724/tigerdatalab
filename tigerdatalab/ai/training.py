@@ -1,18 +1,15 @@
 """Universal, adapter-based LLM training interfaces.
 
-TigerDataLab cannot modify the weights of literally every model in existence: each
-model family exposes different training interfaces. Instead this module provides a
-stable training contract, a production Hugging Face/TRL backend for local/open
-models, and a custom-backend escape hatch for any model or vendor that exposes its
-own training API or SDK. Credentials and provider-specific implementation details
-stay outside prepared datasets.
+TigerDataLab provides a stable training contract, a production Hugging Face/TRL
+backend for compatible local/open models, optional PEFT/LoRA support, and a custom
+backend escape hatch for vendor-specific training APIs or proprietary models.
 """
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, Callable, Mapping
 
 
 class TrainingDependencyError(ImportError):
@@ -68,8 +65,8 @@ class TransformersSFTBackend(TrainingBackend):
     capabilities = TrainingCapabilities(
         supervised_fine_tuning=True,
         preference_tuning=False,
-        quantization=False,
-        peft=False,
+        quantization=True,
+        peft=True,
         local=True,
     )
 
@@ -85,7 +82,19 @@ class TransformersSFTBackend(TrainingBackend):
                 "LLM training requires optional dependencies. Install with "
                 "`pip install 'tigerdatalab[train]'`."
             ) from exc
-        return HFDataset, load_dataset, AutoModelForCausalLM, AutoTokenizer, SFTConfig, SFTTrainer
+        try:
+            from peft import LoraConfig
+        except ImportError:
+            LoraConfig = None
+        return (
+            HFDataset,
+            load_dataset,
+            AutoModelForCausalLM,
+            AutoTokenizer,
+            SFTConfig,
+            SFTTrainer,
+            LoraConfig,
+        )
 
     @staticmethod
     def _load_dataset(dataset: Any, load_dataset: Callable[..., Any], hf_dataset_type: Any) -> Any:
@@ -98,6 +107,8 @@ class TransformersSFTBackend(TrainingBackend):
         if isinstance(dataset, (str, Path)):
             path = str(dataset)
             return load_dataset("json", data_files=path, split="train")
+        if isinstance(dataset, list):
+            return hf_dataset_type.from_list(dataset)
         return dataset
 
     def train(self, request: TrainingRequest) -> Any:
@@ -106,15 +117,49 @@ class TransformersSFTBackend(TrainingBackend):
                 f"Transformers backend currently supports SFT only, not {request.task!r}"
             )
         if not isinstance(request.model, str) or not request.model.strip():
-            raise TrainingError("Transformers backend requires a Hugging Face model id or local model path")
+            raise TrainingError(
+                "Transformers backend requires a Hugging Face model id or local model path"
+            )
 
-        HFDataset, load_dataset, AutoModelForCausalLM, AutoTokenizer, SFTConfig, SFTTrainer = self._dependencies()
+        (
+            HFDataset,
+            load_dataset,
+            AutoModelForCausalLM,
+            AutoTokenizer,
+            SFTConfig,
+            SFTTrainer,
+            LoraConfig,
+        ) = self._dependencies()
         hf_dataset = self._load_dataset(request.dataset, load_dataset, HFDataset)
+        options = dict(request.options)
 
         tokenizer = AutoTokenizer.from_pretrained(request.model)
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
-        model = AutoModelForCausalLM.from_pretrained(request.model)
+
+        model_kwargs: dict[str, Any] = {}
+        if options.pop("load_in_4bit", False):
+            model_kwargs["load_in_4bit"] = True
+        if options.pop("load_in_8bit", False):
+            model_kwargs["load_in_8bit"] = True
+        model = AutoModelForCausalLM.from_pretrained(request.model, **model_kwargs)
+
+        use_lora = bool(options.pop("use_lora", False))
+        if use_lora:
+            if LoraConfig is None:
+                raise TrainingDependencyError(
+                    "LoRA training requires PEFT. Install with `pip install 'tigerdatalab[train]'`."
+                )
+            peft_config = LoraConfig(
+                r=int(options.pop("lora_r", 16)),
+                lora_alpha=int(options.pop("lora_alpha", 32)),
+                lora_dropout=float(options.pop("lora_dropout", 0.05)),
+                bias=str(options.pop("lora_bias", "none")),
+                task_type="CAUSAL_LM",
+                target_modules=options.pop("target_modules", None),
+            )
+        else:
+            peft_config = None
 
         config_kwargs = dict(
             output_dir=request.output_dir,
@@ -123,14 +168,19 @@ class TransformersSFTBackend(TrainingBackend):
             learning_rate=request.learning_rate,
             gradient_accumulation_steps=request.gradient_accumulation_steps,
             report_to="none",
-            **dict(request.options),
+            **options,
         )
         if request.max_seq_length is not None:
-            # Newer TRL exposes this as max_length; older releases may reject it.
             config_kwargs["max_length"] = request.max_seq_length
 
         args = SFTConfig(**config_kwargs)
-        trainer_args = {"model": model, "args": args, "train_dataset": hf_dataset}
+        trainer_args = {
+            "model": model,
+            "args": args,
+            "train_dataset": hf_dataset,
+        }
+        if peft_config is not None:
+            trainer_args["peft_config"] = peft_config
         try:
             trainer = SFTTrainer(processing_class=tokenizer, **trainer_args)
         except TypeError:
@@ -142,15 +192,17 @@ class TransformersSFTBackend(TrainingBackend):
 
 
 class CallableTrainingBackend(TrainingBackend):
-    """Adapter for vendor SDKs, proprietary models, or custom training systems.
-
-    The callable receives a normalized :class:`TrainingRequest`, so TigerDataLab
-    can support a new model family without changing the dataset pipeline.
-    """
+    """Adapter for vendor SDKs, proprietary models, or custom training systems."""
 
     name = "custom"
 
-    def __init__(self, function: Callable[[TrainingRequest], Any], *, name: str = "custom", capabilities: TrainingCapabilities | None = None):
+    def __init__(
+        self,
+        function: Callable[[TrainingRequest], Any],
+        *,
+        name: str = "custom",
+        capabilities: TrainingCapabilities | None = None,
+    ):
         self.function = function
         self.name = name
         if capabilities is not None:
@@ -161,12 +213,7 @@ class CallableTrainingBackend(TrainingBackend):
 
 
 class UniversalTrainer:
-    """Model-agnostic training facade with pluggable backends.
-
-    ``backend='auto'`` uses the built-in Transformers backend for a model id/path.
-    For a vendor-specific training API, pass a :class:`TrainingBackend` instance.
-    This makes the public API stable even when model vendors use different SDKs.
-    """
+    """Model-agnostic training facade with pluggable backends."""
 
     def __init__(
         self,
@@ -225,11 +272,7 @@ def register_training_backend(
     name: str = "custom",
     capabilities: TrainingCapabilities | None = None,
 ) -> Callable[[TrainingRequest], Any]:
-    """Return a callable decorated/registered as a custom backend.
-
-    This helper keeps integration simple for providers whose training API is not
-    part of TigerDataLab's optional dependencies.
-    """
+    """Return a callable decorated/registered as a custom backend."""
     return CallableTrainingBackend(function, name=name, capabilities=capabilities).function
 
 
