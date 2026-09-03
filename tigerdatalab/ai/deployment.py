@@ -16,11 +16,7 @@ class DeploymentError(RuntimeError):
 
 @dataclass(frozen=True)
 class DeploymentConfig:
-    """Configuration for a deployed company agent.
-
-    Authentication is optional for backwards compatibility, but should be enabled
-    for every internet-facing deployment with ``TIGERDATALAB_API_KEY``.
-    """
+    """Configuration for a deployed company agent."""
     name: str
     version: str = "1.0.0"
     api_prefix: str = "/v1"
@@ -30,11 +26,7 @@ class DeploymentConfig:
 
 
 class InMemoryAuditLog:
-    """Small, thread-safe audit sink suitable for a single process.
-
-    Enterprise deployments should provide a durable audit sink outside the
-    application process (SIEM, database, or log platform).
-    """
+    """Small, thread-safe audit sink suitable for a single process."""
 
     def __init__(self, max_entries: int = 10000) -> None:
         self._events: deque[dict[str, Any]] = deque(maxlen=max_entries)
@@ -76,7 +68,7 @@ def create_app(
     compatibility; internet-facing deployments should always configure one.
     """
     try:
-        from fastapi import Body, FastAPI, Header, HTTPException, Request
+        from fastapi import Body, FastAPI, HTTPException, Request
     except ImportError as exc:
         raise DeploymentError(
             "FastAPI is required for deployment. Install with: "
@@ -102,14 +94,16 @@ def create_app(
     buckets: dict[str, deque[float]] = {}
     lock = threading.Lock()
 
-    def guard(request: Request, authorization: str | None) -> str:
+    def guard(request: Request) -> str:
+        """Authenticate and rate-limit a request without relying on FastAPI header injection."""
         identity = _client_id(request)
+        authorization = request.headers.get("authorization")
         if auth_required:
             expected = f"Bearer {configured_key}"
             if (
                 not authorization
-                or hashlib.sha256(authorization.encode()).digest()
-                != hashlib.sha256(expected.encode()).digest()
+                or not hashlib.sha256(authorization.encode()).digest()
+                == hashlib.sha256(expected.encode()).digest()
             ):
                 audit.record(
                     {
@@ -120,6 +114,7 @@ def create_app(
                     }
                 )
                 raise HTTPException(status_code=401, detail="invalid or missing API credentials")
+
         now = time.monotonic()
         with lock:
             bucket = buckets.setdefault(identity, deque())
@@ -153,9 +148,8 @@ def create_app(
     def ask(
         request: Request,
         payload: Mapping[str, Any] = Body(...),
-        authorization: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        identity = guard(request, authorization)
+        identity = guard(request)
         prompt = payload.get("prompt")
         if not isinstance(prompt, str) or not prompt.strip():
             raise HTTPException(status_code=400, detail="prompt must be a non-empty string")
@@ -181,9 +175,8 @@ def create_app(
     def run(
         request: Request,
         payload: Mapping[str, Any] | None = Body(default=None),
-        authorization: str | None = Header(default=None),
     ) -> Any:
-        identity = guard(request, authorization)
+        identity = guard(request)
         result = agent.run(dict(payload or {}))
         audit.record(
             {
@@ -196,11 +189,8 @@ def create_app(
         return result
 
     @app.get("/v1/audit")
-    def audit_events(
-        request: Request,
-        authorization: str | None = Header(default=None),
-    ) -> list[dict[str, Any]]:
-        guard(request, authorization)
+    def audit_events(request: Request) -> list[dict[str, Any]]:
+        guard(request)
         if not hasattr(audit, "events"):
             raise HTTPException(status_code=501, detail="audit sink does not support reading events")
         return audit.events()
