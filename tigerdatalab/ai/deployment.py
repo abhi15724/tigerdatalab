@@ -51,7 +51,11 @@ class InMemoryAuditLog:
 
 def _client_id(request: Any) -> str:
     forwarded = request.headers.get("x-forwarded-for")
-    return (forwarded.split(",", 1)[0].strip() if forwarded else request.client.host if request.client else "unknown")
+    return (
+        forwarded.split(",", 1)[0].strip()
+        if forwarded
+        else request.client.host if request.client else "unknown"
+    )
 
 
 def create_app(
@@ -72,7 +76,7 @@ def create_app(
     compatibility; internet-facing deployments should always configure one.
     """
     try:
-        from fastapi import FastAPI, Header, HTTPException, Request
+        from fastapi import Body, FastAPI, Header, HTTPException, Request
     except ImportError as exc:
         raise DeploymentError(
             "FastAPI is required for deployment. Install with: "
@@ -102,8 +106,19 @@ def create_app(
         identity = _client_id(request)
         if auth_required:
             expected = f"Bearer {configured_key}"
-            if not authorization or not hashlib.sha256(authorization.encode()).digest() == hashlib.sha256(expected.encode()).digest():
-                audit.record({"event": "auth_failed", "path": request.url.path, "client": identity, "timestamp": time.time()})
+            if (
+                not authorization
+                or hashlib.sha256(authorization.encode()).digest()
+                != hashlib.sha256(expected.encode()).digest()
+            ):
+                audit.record(
+                    {
+                        "event": "auth_failed",
+                        "path": request.url.path,
+                        "client": identity,
+                        "timestamp": time.time(),
+                    }
+                )
                 raise HTTPException(status_code=401, detail="invalid or missing API credentials")
         now = time.monotonic()
         with lock:
@@ -112,7 +127,14 @@ def create_app(
             while bucket and bucket[0] <= cutoff:
                 bucket.popleft()
             if len(bucket) >= rate_limit:
-                audit.record({"event": "rate_limited", "path": request.url.path, "client": identity, "timestamp": time.time()})
+                audit.record(
+                    {
+                        "event": "rate_limited",
+                        "path": request.url.path,
+                        "client": identity,
+                        "timestamp": time.time(),
+                    }
+                )
                 raise HTTPException(status_code=429, detail="rate limit exceeded")
             bucket.append(now)
         return identity
@@ -128,25 +150,56 @@ def create_app(
         return {"status": "ready"}
 
     @app.post("/v1/ask")
-    def ask(request: Request, payload: Mapping[str, Any], authorization: str | None = Header(default=None)) -> dict[str, Any]:
+    def ask(
+        request: Request,
+        payload: Mapping[str, Any] = Body(...),
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
         identity = guard(request, authorization)
         prompt = payload.get("prompt")
         if not isinstance(prompt, str) or not prompt.strip():
             raise HTTPException(status_code=400, detail="prompt must be a non-empty string")
         options = dict(payload.get("options") or {})
         result = agent.ask(prompt, **options)
-        audit.record({"event": "agent_ask", "path": "/v1/ask", "client": identity, "timestamp": time.time(), "model": result.model})
-        return {"output": result.output, "model": result.model, "context": result.context, "tool_results": result.tool_results}
+        audit.record(
+            {
+                "event": "agent_ask",
+                "path": "/v1/ask",
+                "client": identity,
+                "timestamp": time.time(),
+                "model": result.model,
+            }
+        )
+        return {
+            "output": result.output,
+            "model": result.model,
+            "context": result.context,
+            "tool_results": result.tool_results,
+        }
 
     @app.post("/v1/run")
-    def run(request: Request, payload: Mapping[str, Any] | None = None, authorization: str | None = Header(default=None)) -> Any:
+    def run(
+        request: Request,
+        payload: Mapping[str, Any] | None = Body(default=None),
+        authorization: str | None = Header(default=None),
+    ) -> Any:
         identity = guard(request, authorization)
         result = agent.run(dict(payload or {}))
-        audit.record({"event": "workflow_run", "path": "/v1/run", "client": identity, "timestamp": time.time()})
+        audit.record(
+            {
+                "event": "workflow_run",
+                "path": "/v1/run",
+                "client": identity,
+                "timestamp": time.time(),
+            }
+        )
         return result
 
     @app.get("/v1/audit")
-    def audit_events(request: Request, authorization: str | None = Header(default=None)) -> list[dict[str, Any]]:
+    def audit_events(
+        request: Request,
+        authorization: str | None = Header(default=None),
+    ) -> list[dict[str, Any]]:
         guard(request, authorization)
         if not hasattr(audit, "events"):
             raise HTTPException(status_code=501, detail="audit sink does not support reading events")
