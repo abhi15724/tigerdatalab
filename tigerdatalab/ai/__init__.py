@@ -26,6 +26,7 @@ from .router import ModelRouter, ModelTarget, RoutingError, router_from_config
 from .schema import ValidationIssue, ValidationReport, validate_record, validate_records
 from .system import AIResult, CompanyAI
 from .agent import CompanyAgent, CompanyAgentProject
+from .deployment import DeploymentConfig, DeploymentError, create_app, serve
 from .tools import Tool, ToolError, ToolRegistry, tool
 from .training import (
     CallableTrainingBackend,
@@ -57,4 +58,5 @@ __all__ = [
     "Tool", "ToolError", "ToolRegistry", "tool", "Workflow", "WorkflowError", "WorkflowResult",
     "WorkflowStep", "step", "ModelRouter", "ModelTarget", "RoutingError", "router_from_config",
     "Asset", "Registry", "CompanyAI", "AIResult", "CompanyAgent", "CompanyAgentProject",
+    "DeploymentConfig", "DeploymentError", "create_app", "serve",
 ]
