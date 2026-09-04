@@ -805,6 +805,7 @@ See [`LICENSE`](LICENSE).
 - [Hindi README](README.hi.md)
 - [End-to-end AI training guide](docs/end-to-end-ai-training.md)
 - [CI](https://github.com/abhi15724/tigerdatalab/actions/workflows/ci.yml)
+- [DOWNLOAD MANUAL] (https://drive.google.com/file/d/1VYXnzrT9bizGtFk7_DVPXBNMi-iKvb-m/view?usp=sharing)
 
 <div align="center">
 
