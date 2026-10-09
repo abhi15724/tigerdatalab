@@ -43,7 +43,7 @@ Known constraints that must remain explicit:
 - [ ] Retry policies include bounded attempts and backoff; permanent failures reach a terminal/dead-letter state.
 - [ ] Checkpoint writes are atomic and versioned; resume behavior is tested after process termination.
 - [ ] Side effects use idempotency keys or explicitly document at-least-once semantics.
-- [ ] PostgreSQL integration tests run against a real service in CI.
+- [ ] PostgreSQL integration tests run against a real service in CI (`.github/workflows/production-gates.yml` added; mark complete only after a successful run).
 
 ### P1 — Observability and operations
 - [ ] Each run/task has a correlation ID and structured lifecycle events.
@@ -57,7 +57,7 @@ Known constraints that must remain explicit:
 - [ ] Build source distribution and wheel from a clean checkout.
 - [ ] Validate distributions with Twine and smoke-test installation from built artifacts.
 - [ ] Verify the CLI entry point and core imports after installation.
-- [ ] Pin dependencies in deployable applications and periodically review dependency vulnerabilities.
+- [ ] Pin dependencies in deployable applications and periodically review dependency vulnerabilities (`.github/workflows/production-gates.yml` adds `pip-audit`; review any findings before release).
 - [ ] Keep the documented Python support range, CI matrix, and package classifiers consistent.
 
 ### P2 — Data and AI quality
@@ -71,13 +71,13 @@ Known constraints that must remain explicit:
 ## Required verification evidence
 
 Attach links or artifacts for each release candidate:
-1. CI matrix result for every supported Python version.
+1. CI matrix result for every supported Python version and all production-gate workflow jobs on the exact release commit.
 2. Full test result plus targeted failure/recovery and security tests.
 3. Wheel and source distribution validation, plus clean-install smoke test.
 4. PostgreSQL integration result for distributed deployments.
 5. Dependency/security scan result and reviewed exceptions.
 6. Deployment-specific load test, backup/restore drill, and rollback procedure.
-7. Known limitations and operator runbook.
+7. Known limitations and operator runbook (`docs/PRODUCTION_OPERATIONS.md`); deployment-specific sign-off remains mandatory.
 
 ## Suggested execution order
 
@@ -89,4 +89,4 @@ Attach links or artifacts for each release candidate:
 
 ## Production status
 
-**Status: readiness work in progress.** This checklist intentionally distinguishes implemented primitives from deployment-level guarantees. Do not describe the platform as production-ready for a specific workload until its relevant gates have passed in that workload's environment.
+**Status: readiness work in progress; no production certification issued.** Security-default hardening, a PostgreSQL integration workflow, and a dependency-audit workflow have been added on the production-certification branch. These gates remain unverified until GitHub Actions passes on the latest branch commit and findings are reviewed. CI cannot replace staging, load, backup/restore, threat-model, or independent security testing. Do not describe the platform as production-ready for a specific workload until its relevant gates have passed in that workload's environment.
