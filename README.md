@@ -453,6 +453,52 @@ Use the credential name documented for the provider/version you install.
 
 ---
 
+# 9. Agent Framework: Graphs, Async Execution and Tools
+
+TigerDataLab combines data preparation, retrieval, model providers, tools, agent construction, evaluation and workflow orchestration. The graph APIs are for application control flow; the AgentRuntime is for bounded model-to-tool interaction.
+
+### Parallel asynchronous DAG
+
+```python
+import asyncio
+from tigerdatalab.ai import AsyncGraph, GraphNode
+
+async def research_a(state):
+    return {"research_a": "Source A"}
+
+async def research_b(state):
+    return {"research_b": "Source B"}
+
+def combine(state):
+    return {"summary": state["research_a"] + "; " + state["research_b"]}
+
+graph = AsyncGraph("research", max_concurrency=4)
+graph.add_node(GraphNode("research_a", research_a))
+graph.add_node(GraphNode("research_b", research_b))
+graph.add_node(GraphNode("combine", combine))
+graph.add_edge("research_a", "combine")
+graph.add_edge("research_b", "combine")
+
+result = asyncio.run(graph.run_async({"topic": "AI frameworks"}))
+assert result.status == "completed"
+print(result.state["summary"])
+```
+
+### When to use each API
+
+| Component | Best use |
+|---|---|
+| `Workflow` | Simple ordered business steps |
+| `Graph` | Synchronous conditional routing, loops, checkpointing and approvals |
+| `AsyncGraph` | Concurrent async/sync DAGs with fan-out and joins |
+| `AgentRuntime` | Bounded model/tool loop with tool allow-list, permissions, optional approvals, traces and usage budgets |
+| `AgentFactory` / `CompanyAgent` | Reusable agent configuration, knowledge, model provider, tools and evaluation |
+| `AIDataset` / `UniversalTrainer` | Prepare, validate and train on AI datasets using compatible backends |
+
+AsyncGraph is DAG-only; use Graph for loop-style workflows. Persistent graph checkpoints require a durable filesystem when using SQLite. Tool and model adapters should enforce provider-specific limits and tenant policies in production.
+
+---
+
 # 9. Company AI / RAG
 
 Use RAG when company information changes frequently and should not require retraining.
