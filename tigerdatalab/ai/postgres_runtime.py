@@ -11,7 +11,7 @@ import time
 import uuid
 from typing import Any, Mapping
 
-from .distributed import QueueError, Task
+from .distributed import QueueError, Task, TaskQueue
 from .graph import GraphCheckpoint, GraphError
 
 
