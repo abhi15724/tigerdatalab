@@ -33,7 +33,7 @@ def test_create_app_ask_endpoint():
     pytest.importorskip("fastapi")
     from fastapi.testclient import TestClient
 
-    app = create_app(FakeAgent())
+    app = create_app(FakeAgent(), require_auth=False)
     response = TestClient(app).post("/v1/ask", json={"prompt": "What is the policy?"})
     assert response.status_code == 200
     assert response.json()["output"] == "company answer"
