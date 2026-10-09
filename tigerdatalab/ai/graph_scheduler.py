@@ -192,7 +192,7 @@ class DistributedGraphScheduler:
 
     async def process_once_async(self, *, retry_delay: float = 0) -> bool:
         """Claim and process one queued graph task asynchronously."""
-        return await self._worker.process_once_async(
+        return await self._async_worker.process_once_async(
             lease_seconds=self.lease_seconds, retry_delay=retry_delay
         )
 
