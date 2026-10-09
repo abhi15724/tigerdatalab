@@ -167,7 +167,10 @@ def create_app(
         prompt = payload.get("prompt")
         if not isinstance(prompt, str) or not prompt.strip():
             raise HTTPException(status_code=400, detail="prompt must be a non-empty string")
-        options = dict(payload.get("options") or {})
+        raw_options = payload.get("options", {})
+        if not isinstance(raw_options, Mapping):
+            raise HTTPException(status_code=400, detail="options must be a JSON object")
+        options = dict(raw_options)
         result = agent.ask(prompt, **options)
         audit.record(
             {
