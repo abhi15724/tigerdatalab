@@ -1,16 +1,13 @@
 # Graph Workflows
 
 ## Design target
-Evolve the current linear `Workflow` into a resumable graph runtime only through small, tested increments. Preserve the simple linear path for ordinary tasks.
+Use `tigerdatalab.ai.Graph` for branching or resumable workflows; use the existing `Workflow` for simple linear sequences.
 
-## Required semantics for graph features
-- Explicit typed state and named nodes.
-- Declared edges and conditional routing with validation for missing nodes.
-- Bounded steps/iterations, per-node timeout policy, and clear failure state.
-- Retry only where the operation is safe to repeat; avoid blind retries for side effects.
-- Checkpoint state before/after expensive or side-effecting operations.
-- Resume from validated checkpoints and record the graph version.
-- Approval gates for sensitive actions; approvals must be enforced by the action handler.
-- Test cycles, dead ends, exceptions, resume behavior and deterministic branch selection.
-
-Do not claim durable execution, parallel scheduling or distributed workers until each capability exists and is tested.
+## Required semantics
+- Explicit named nodes and declared edges; validate missing nodes and ambiguous fallback edges.
+- Bound node executions and return clear failure results.
+- Retries require explicit `retry_safe=True`; do not retry side effects blindly.
+- Checkpoint after each successful node and validate graph name/version before resuming.
+- Treat the default in-memory checkpoint store as process-local, not durable persistence.
+- Add tests for cycles, dead ends, branch selection, exceptions, retries, resume and incompatible checkpoints.
+- Do not claim distributed durability, exactly-once effects, parallel execution, async nodes, timeouts or approval gates unless implemented and tested.
