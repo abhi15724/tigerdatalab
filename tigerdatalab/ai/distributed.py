@@ -84,6 +84,11 @@ class SQLiteTaskQueue:
         with self._lock:
             self._db.execute("BEGIN IMMEDIATE")
             try:
+                self._db.execute(
+                    "UPDATE tasks SET status='failed',error='lease expired after max attempts',lease_owner=NULL,lease_until=NULL,updated_at=? "
+                    "WHERE status='leased' AND lease_until <= ? AND attempts >= max_attempts",
+                    (now, now),
+                )
                 row = self._db.execute("""
                     SELECT id,task_type,payload_json,tenant_id,attempts,max_attempts,lease_owner,lease_until
                     FROM tasks
@@ -114,24 +119,36 @@ class SQLiteTaskQueue:
     def complete(self, task_id: str, worker_id: str, result: Mapping[str, Any]) -> None:
         encoded, now = json.dumps(dict(result), ensure_ascii=False, allow_nan=False), time.time()
         with self._lock:
-            self._assert_owner(task_id, worker_id)
-            self._db.execute(
-                "UPDATE tasks SET status='completed',result_json=?,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE id=?",
-                (encoded, now, task_id),
-            )
+            self._db.execute("BEGIN IMMEDIATE")
+            try:
+                self._assert_owner(task_id, worker_id)
+                self._db.execute(
+                    "UPDATE tasks SET status='completed',result_json=?,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE id=? AND status='leased' AND lease_owner=?",
+                    (encoded, now, task_id, worker_id),
+                )
+                self._db.commit()
+            except Exception:
+                self._db.rollback()
+                raise
 
     def fail(self, task_id: str, worker_id: str, error: str, *, retry_delay: float = 0) -> None:
         if retry_delay < 0:
             raise ValueError("retry_delay cannot be negative")
         now = time.time()
         with self._lock:
-            self._assert_owner(task_id, worker_id)
-            row = self._db.execute("SELECT attempts,max_attempts FROM tasks WHERE id=?", (task_id,)).fetchone()
-            status = "queued" if row[0] < row[1] else "failed"
-            self._db.execute(
-                "UPDATE tasks SET status=?,error=?,available_at=?,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE id=?",
-                (status, str(error)[:4000], now + retry_delay, now, task_id),
-            )
+            self._db.execute("BEGIN IMMEDIATE")
+            try:
+                self._assert_owner(task_id, worker_id)
+                row = self._db.execute("SELECT attempts,max_attempts FROM tasks WHERE id=?", (task_id,)).fetchone()
+                status = "queued" if row[0] < row[1] else "failed"
+                self._db.execute(
+                    "UPDATE tasks SET status=?,error=?,available_at=?,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE id=? AND status='leased' AND lease_owner=?",
+                    (status, str(error)[:4000], now + retry_delay, now, task_id, worker_id),
+                )
+                self._db.commit()
+            except Exception:
+                self._db.rollback()
+                raise
 
     def get(self, task_id: str, *, tenant_id: str) -> dict[str, Any] | None:
         with self._lock:
