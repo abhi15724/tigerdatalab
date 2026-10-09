@@ -141,3 +141,22 @@ def test_docker_sandbox_builds_restricted_argv_without_shell(monkeypatch):
     assert "--read-only" in seen["argv"]
     assert "--cap-drop=ALL" in seen["argv"]
     assert seen["kwargs"]["shell"] is False
+
+
+
+def test_environment_secret_provider_requires_configured_uppercase_name():
+    from tigerdatalab.ai.secrets import EnvironmentSecretProvider, SecretResolutionError
+    provider = EnvironmentSecretProvider({"SERVICE_TOKEN": "hidden-value"})
+    assert provider.get("SERVICE_TOKEN") == "hidden-value"
+    try:
+        provider.get("MISSING_TOKEN")
+    except SecretResolutionError:
+        pass
+    else:
+        raise AssertionError("expected missing secret error")
+    try:
+        provider.get("../token")
+    except SecretResolutionError:
+        pass
+    else:
+        raise AssertionError("expected invalid secret name")
