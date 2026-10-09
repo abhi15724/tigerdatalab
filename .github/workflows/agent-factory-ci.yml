@@ -16,7 +16,24 @@ permissions:
 jobs:
   agent-factory-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tdl_test
+          POSTGRES_PASSWORD: tdl_test_password
+          POSTGRES_DB: tigerdatalab_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tdl_test -d tigerdatalab_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TIGERDATALAB_TEST_POSTGRES_DSN: postgresql://tdl_test:tdl_test_password@localhost:5432/tigerdatalab_test
+
     strategy:
       fail-fast: false
       matrix:
@@ -33,7 +50,7 @@ jobs:
       - name: Install package and test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e '.[large]' pytest
+          python -m pip install -e '.[large,postgres]' pytest
       - name: Run focused AI framework tests
         run: python -m pytest -q tests/test_agent_factory.py tests/test_ai_graph.py tests/test_async_graph.py tests/test_agent_runtime.py tests/test_agent_infrastructure.py tests/test_graph_scheduler.py tests/test_postgres_runtime.py tests/test_distributed_heartbeat.py tests/test_postgres_integration.py
       - name: Run full test suite
