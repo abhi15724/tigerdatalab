@@ -160,3 +160,16 @@ def test_environment_secret_provider_requires_configured_uppercase_name():
         pass
     else:
         raise AssertionError("expected invalid secret name")
+
+
+
+def test_inspect_graph_run_reads_checkpoint_without_execution():
+    from tigerdatalab.ai.graph import InMemoryCheckpointStore, GraphCheckpoint
+    from tigerdatalab.ai.graph_visualization import inspect_graph_run
+    store = InMemoryCheckpointStore()
+    store.save("r1", GraphCheckpoint("g", "1", "step_b", {"value": 2}, ["step_a"], 1, "running"))
+    snapshot = inspect_graph_run(store, "r1")
+    assert snapshot["status"] == "running"
+    assert snapshot["current_node"] == "step_b"
+    assert snapshot["completed_nodes"] == ["step_a"]
+    assert inspect_graph_run(store, "missing") is None
