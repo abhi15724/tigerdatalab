@@ -862,3 +862,7 @@ See [`LICENSE`](LICENSE).
 ## Distributed Graph Scheduler and Debugger
 
 Queue synchronous or asynchronous graphs through a durable task queue, resume checkpointed runs after worker recovery, and inspect graph topology/checkpoints in a standalone HTML debugger. See [the scheduler guide](docs/distributed-graph-scheduler.md) for examples and the at-least-once execution limitations.
+
+## Distributed runtime (PostgreSQL)
+
+For multi-worker deployments, TigerDataLab includes optional PostgreSQL-backed task queue and graph checkpoint adapters. Install with `pip install 'tigerdatalab[postgres]'` and follow [the distributed runtime guide](docs/postgres-distributed-runtime.md). SQLite remains the local/single-host default; PostgreSQL adapters require validation against a real PostgreSQL service before production.
