@@ -858,3 +858,7 @@ See [`LICENSE`](LICENSE).
 **🐯 TigerDataLab — From Raw Data to Production AI**
 
 </div>
+
+## Distributed Graph Scheduler and Debugger
+
+Queue synchronous or asynchronous graphs through a durable task queue, resume checkpointed runs after worker recovery, and inspect graph topology/checkpoints in a standalone HTML debugger. See [the scheduler guide](docs/distributed-graph-scheduler.md) for examples and the at-least-once execution limitations.
