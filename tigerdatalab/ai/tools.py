@@ -87,13 +87,18 @@ class Tool:
     def schema(self) -> dict[str, Any]:
         return {"type": "function", "function": {"name": self.name, "description": self.description, "parameters": dict(self.parameters)}}
 
-    def execute(self, arguments: Mapping[str, Any] | None = None) -> Any:
-        if not self.enabled:
-            raise ToolError(f"Tool '{self.name}' is disabled")
+    def validate_arguments(self, arguments: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        """Validate and normalize arguments without invoking the tool."""
         if arguments is not None and not isinstance(arguments, Mapping):
             raise ToolError(f"Arguments for tool '{self.name}' must be an object")
         args = dict(arguments or {})
         _validate_schema_value(args, self.parameters, "arguments")
+        return args
+
+    def execute(self, arguments: Mapping[str, Any] | None = None) -> Any:
+        if not self.enabled:
+            raise ToolError(f"Tool '{self.name}' is disabled")
+        args = self.validate_arguments(arguments)
         try:
             return self.function(**args)
         except TypeError as exc:
