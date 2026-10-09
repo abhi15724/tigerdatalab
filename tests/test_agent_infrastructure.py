@@ -244,3 +244,23 @@ def test_tool_schema_checks_nested_array_types_and_rejects_non_object_arguments(
             pass
         else:
             raise AssertionError(f"expected schema rejection for {invalid!r}")
+
+
+def test_agent_runtime_validates_schema_before_async_or_sync_tool_call():
+    calls = []
+    tools = ToolRegistry()
+    tools.register(Tool(
+        "set_value", "Set a numeric value", lambda value: calls.append(value),
+        parameters={"type": "object", "properties": {"value": {"type": "integer"}},
+                    "required": ["value"], "additionalProperties": False},
+    ))
+    turns = iter([
+        AgentTurn(tool_calls=(AgentToolCall("call-1", "set_value", {"value": "not-an-integer"}),)),
+        AgentTurn(text="finished"),
+    ])
+    runtime = AgentRuntime(lambda messages, schemas: next(turns), tools,
+                           permissions=PermissionPolicy().allow("default", "set_value"))
+    result = runtime.run("set a value")
+    assert result.status == "completed"
+    assert calls == []
+    assert "Invalid arguments" in result.tool_results["call-1"]["message"]
