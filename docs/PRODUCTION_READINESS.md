@@ -11,7 +11,7 @@ This document is an engineering gate, not a claim that every item is already imp
 The repository already includes a bounded agent runtime, tool allow-lists and permission policies, optional approval hooks, tracing/audit interfaces, in-memory conversation memory, graph checkpointing, a task scheduler, and optional PostgreSQL adapters. These are useful primitives; they do not by themselves guarantee production safety or distributed correctness.
 
 Known constraints that must remain explicit:
-- `InMemoryConversationMemory` is process-local and is not durable or tenant-isolated storage.
+- `InMemoryConversationMemory` is process-local (tenant-scoped in the runtime hardening branch) and is not durable across process restarts; use `SQLiteConversationMemory` for local/single-host persistence.
 - Provider tool calling is adapter-specific; the OpenAI-compatible adapter is not a universal native adapter for every provider.
 - Distributed task execution may be at-least-once. Side-effecting tasks must be idempotent or protected by application-level deduplication.
 - SQLite is appropriate for local/single-host use; PostgreSQL-backed multi-worker behavior must be tested against a real PostgreSQL service.
@@ -22,7 +22,8 @@ Known constraints that must remain explicit:
 ### P0 — Correctness and safe failure
 - [ ] Every public runtime validates budgets and configuration at construction time.
 - [ ] Model/provider failures, invalid tool-call JSON, unknown tools, permission denials, approval denials, timeouts, and cancellation have deterministic outcomes.
-- [ ] Tool execution has a bounded timeout and bounded number of calls/steps.
+- [x] Tool execution has a bounded timeout and bounded number of calls/steps.
+- [x] Model calls have a configurable timeout; timeout regression tests are included in PR #11.
 - [ ] Token/usage accounting handles missing, malformed, negative, and cumulative usage values safely.
 - [ ] Errors returned to callers do not expose credentials, raw secrets, or sensitive prompt/context contents.
 - [ ] Repeated run IDs, task retries, worker restarts, and checkpoint corruption have defined behavior.
@@ -31,7 +32,7 @@ Known constraints that must remain explicit:
 - [ ] Tool schemas and arguments are validated before invocation.
 - [ ] Tool permissions are deny-by-default and checked at execution time, not only when tools are advertised to a model.
 - [ ] Approval is required for destructive, external, financial, or otherwise high-impact tools.
-- [ ] Tenant/user identity is part of every persistent memory, checkpoint, task, audit, and retrieval key where multi-tenancy is supported.
+- [x] Conversation-memory adapters namespace records by tenant and conversation; verify tenant scoping separately for checkpoint, task, audit, and retrieval stores before enabling multi-tenancy across those components.
 - [ ] No API keys or production credentials are committed; secrets are injected through the deployment environment/secret manager.
 - [ ] Logs and traces redact sensitive data by default and have a documented retention policy.
 - [ ] Untrusted tool/model output is treated as data, never as executable instructions.
