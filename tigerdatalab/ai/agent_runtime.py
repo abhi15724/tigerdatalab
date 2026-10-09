@@ -241,9 +241,14 @@ class AgentRuntime:
         try:
             for step_no in range(1, self.max_steps + 1):
                 emit("model_start", step_no)
-                turn = await asyncio.wait_for(
-                    self._model_turn(messages, schemas), timeout=self.model_timeout_seconds
-                )
+                try:
+                    turn = await asyncio.wait_for(
+                        self._model_turn(messages, schemas), timeout=self.model_timeout_seconds
+                    )
+                except asyncio.TimeoutError as exc:
+                    raise AgentRuntimeError(
+                        f"Model call timed out after {self.model_timeout_seconds:g} seconds"
+                    ) from exc
                 model_name = turn.model or model_name
                 for key, value in turn.usage.items():
                     if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0:
