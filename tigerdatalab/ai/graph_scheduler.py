@@ -8,6 +8,7 @@ shared-volume building blocks, not a multi-region broker.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import inspect
 import uuid
 from typing import Any, Mapping
@@ -34,6 +35,16 @@ class DistributedGraphScheduler:
     """
 
     TASK_TYPE = "tigerdatalab.graph.run"
+
+    @staticmethod
+    def _checkpoint_key(tenant_id: str, run_id: str) -> str:
+        """Derive an opaque checkpoint key scoped to one tenant and public run ID."""
+        if not isinstance(tenant_id, str) or not tenant_id.strip():
+            raise ValueError("tenant_id is required")
+        if not isinstance(run_id, str) or not run_id.strip():
+            raise ValueError("run_id is required")
+        digest = hashlib.sha256((tenant_id + chr(0) + run_id).encode("utf-8")).hexdigest()
+        return "tenant-run-" + digest
 
     def __init__(
         self,
@@ -75,12 +86,15 @@ class DistributedGraphScheduler:
         run_id = run_id or uuid.uuid4().hex
         if not tenant_id or not tenant_id.strip():
             raise ValueError("tenant_id is required")
-        if graph.checkpoint_store.load(run_id) is not None:
-            raise GraphSchedulerError(f"Graph run_id {run_id!r} already exists")
+        checkpoint_run_id = self._checkpoint_key(tenant_id, run_id)
+        if graph.checkpoint_store.load(checkpoint_run_id) is not None:
+            raise GraphSchedulerError(f"Graph run_id {run_id!r} already exists for this tenant")
         payload = {
             "graph_name": graph_name,
             "graph_version": graph.version,
             "graph_run_id": run_id,
+            "checkpoint_run_id": checkpoint_run_id,
+            "tenant_id": tenant_id,
             "inputs": dict(inputs or {}),
             "resume": False,
             "approvals": {},
@@ -100,9 +114,10 @@ class DistributedGraphScheduler:
     ) -> dict[str, str]:
         """Queue a checkpoint resume or supply a pending human approval."""
         graph = self._get_graph(graph_name)
-        checkpoint = graph.checkpoint_store.load(run_id)
+        checkpoint_run_id = self._checkpoint_key(tenant_id, run_id)
+        checkpoint = graph.checkpoint_store.load(checkpoint_run_id)
         if checkpoint is None:
-            raise GraphSchedulerError(f"No checkpoint found for run_id {run_id!r}")
+            raise GraphSchedulerError(f"No checkpoint found for run_id {run_id!r} in this tenant")
         if checkpoint.graph_name != graph.name or checkpoint.graph_version != graph.version:
             raise GraphSchedulerError("Checkpoint graph name/version does not match registered graph")
         if checkpoint.status == "completed":
@@ -118,6 +133,8 @@ class DistributedGraphScheduler:
             "graph_name": graph_name,
             "graph_version": graph.version,
             "graph_run_id": run_id,
+            "checkpoint_run_id": checkpoint_run_id,
+            "tenant_id": tenant_id,
             "inputs": {},
             "resume": True,
             "approvals": decisions,
@@ -145,9 +162,12 @@ class DistributedGraphScheduler:
         if payload.get("graph_version") != graph.version:
             raise GraphSchedulerError("Queued graph version does not match registered graph")
         run_id = str(payload["graph_run_id"])
+        checkpoint_run_id = str(payload.get("checkpoint_run_id") or self._checkpoint_key(
+            str(payload.get("tenant_id", "")), run_id
+        ))
         result = graph.run(
             inputs=payload.get("inputs") or None,
-            run_id=run_id,
+            run_id=checkpoint_run_id,
             resume=bool(payload.get("resume")),
             approvals=payload.get("approvals") or None,
         )
@@ -165,9 +185,12 @@ class DistributedGraphScheduler:
         if payload.get("graph_version") != graph.version:
             raise GraphSchedulerError("Queued graph version does not match registered graph")
         run_id = str(payload["graph_run_id"])
+        checkpoint_run_id = str(payload.get("checkpoint_run_id") or self._checkpoint_key(
+            str(payload.get("tenant_id", "")), run_id
+        ))
         kwargs = {
             "inputs": payload.get("inputs") or None,
-            "run_id": run_id,
+            "run_id": checkpoint_run_id,
             "resume": bool(payload.get("resume")),
             "approvals": payload.get("approvals") or None,
         }
