@@ -10,6 +10,9 @@ import json
 import sqlite3
 import time
 import uuid
+import asyncio
+from contextlib import suppress
+from threading import Event, RLock, Thread
 from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
@@ -175,6 +178,53 @@ class SQLiteTaskQueue:
 
 
 
+class _LeaseHeartbeat:
+    """Best-effort background lease renewal for queues that support it."""
+
+    def __init__(self, queue: TaskQueue, task_id: str, worker_id: str, lease_seconds: float) -> None:
+        self.queue, self.task_id, self.worker_id = queue, task_id, worker_id
+        self.lease_seconds = lease_seconds
+        self._stop = Event()
+        self._thread: Thread | None = None
+        self.error: Exception | None = None
+
+    def __enter__(self):
+        renew = getattr(self.queue, "renew_lease", None)
+        if callable(renew) and self.lease_seconds > 0:
+            self._thread = Thread(target=self._run, args=(renew,), daemon=True,
+                                  name=f"tigerdatalab-lease-{self.task_id[:8]}")
+            self._thread.start()
+        return self
+
+    def _run(self, renew) -> None:
+        interval = max(0.05, self.lease_seconds / 3)
+        while not self._stop.wait(interval):
+            try:
+                renew(self.task_id, self.worker_id, lease_seconds=self.lease_seconds)
+            except Exception as exc:
+                self.error = exc
+                return
+
+    def __exit__(self, *_exc) -> None:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=max(0.1, min(2.0, self.lease_seconds / 2)))
+
+
+async def _async_lease_heartbeat(queue: TaskQueue, task_id: str, worker_id: str,
+                                 lease_seconds: float, stop: asyncio.Event) -> None:
+    renew = getattr(queue, "renew_lease", None)
+    if not callable(renew) or lease_seconds <= 0:
+        return
+    interval = max(0.05, lease_seconds / 3)
+    while True:
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=interval)
+            return
+        except asyncio.TimeoutError:
+            await asyncio.to_thread(renew, task_id, worker_id, lease_seconds=lease_seconds)
+
+
 class TaskWorker:
     """Execute registered task handlers with lease ownership and bounded retries.
 
@@ -198,12 +248,13 @@ class TaskWorker:
             self.queue.fail(task.id, self.worker_id, f"No handler for task type {task.task_type!r}")
             return True
         try:
-            result = handler(dict(task.payload))
-            if hasattr(result, "__await__"):
-                raise QueueError("Async handler used in sync worker; use process_once_async()")
-            if not isinstance(result, Mapping):
-                raise QueueError("Task handler must return a mapping")
-            self.queue.complete(task.id, self.worker_id, result)
+            with _LeaseHeartbeat(self.queue, task.id, self.worker_id, lease_seconds):
+                result = handler(dict(task.payload))
+                if hasattr(result, "__await__"):
+                    raise QueueError("Async handler used in sync worker; use process_once_async()")
+                if not isinstance(result, Mapping):
+                    raise QueueError("Task handler must return a mapping")
+                self.queue.complete(task.id, self.worker_id, result)
         except Exception as exc:
             try:
                 self.queue.fail(task.id, self.worker_id, f"{type(exc).__name__}: {exc}", retry_delay=retry_delay)
@@ -223,6 +274,10 @@ class TaskWorker:
             await asyncio.to_thread(self.queue.fail, task.id, self.worker_id,
                                     f"No handler for task type {task.task_type!r}")
             return True
+        stop_heartbeat = asyncio.Event()
+        heartbeat = asyncio.create_task(
+            _async_lease_heartbeat(self.queue, task.id, self.worker_id, lease_seconds, stop_heartbeat)
+        )
         try:
             result = handler(dict(task.payload))
             if hasattr(result, "__await__"):
@@ -233,4 +288,9 @@ class TaskWorker:
         except Exception as exc:
             await asyncio.to_thread(self.queue.fail, task.id, self.worker_id,
                                     f"{type(exc).__name__}: {exc}", retry_delay=retry_delay)
+        finally:
+            stop_heartbeat.set()
+            heartbeat.cancel()
+            with suppress(asyncio.CancelledError):
+                await heartbeat
         return True
