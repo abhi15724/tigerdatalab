@@ -32,7 +32,7 @@ jobs:
       - name: Install package and test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e . pytest
+          python -m pip install -e '.[large]' pytest
       - name: Run Agent Factory tests
         run: python -m pytest -q tests/test_agent_factory.py
       - name: Run full test suite
