@@ -36,7 +36,7 @@ Every worker must register the same graph name and version, and use the same Pos
 
 ## Lease renewal
 
-The queue exposes `renew_lease(task_id, worker_id, lease_seconds=...)` so custom worker runners can renew long-running leases. A task handler that outlives its lease may be retried by another worker. Do not rely on this adapter for exactly-once effects: use idempotency keys, outbox patterns, or external deduplication for side effects.
+The queue exposes `renew_lease(task_id, worker_id, lease_seconds=...)`. The built-in sync and async task workers now run a best-effort heartbeat for queue adapters that implement this capability, including the PostgreSQL adapter. SQLite does not currently expose lease renewal, so its workers retain the configured lease-duration constraint. If renewal fails, workers must still treat lease ownership checks as authoritative; a task handler may be retried by another worker. Do not rely on this adapter for exactly-once effects: use idempotency keys, outbox patterns, or external deduplication for side effects.
 
 ## Operations and limitations
 
@@ -44,5 +44,5 @@ The queue exposes `renew_lease(task_id, worker_id, lease_seconds=...)` so custom
 - This adapter is optional and must be tested against a real PostgreSQL service before production.
 - Queue and checkpoint writes are separate transactions; a task and its checkpoint are not one atomic unit. Recovery relies on idempotent node actions and graph checkpoints.
 - Tenant IDs scope queue status lookups, but application authorization must still verify that a caller is allowed to submit, resume, or inspect a graph.
-- Lease renewal is exposed as an adapter API; the built-in worker runner does not yet run a background heartbeat.
+- Heartbeats are best-effort; database/network interruptions can still cause lease loss. Use idempotent handlers and monitor worker/database errors.
 - SQLite remains appropriate for local development and single-host persistent-volume deployments.
