@@ -23,7 +23,7 @@ def test_create_app_exposes_health_and_readiness():
     fastapi = pytest.importorskip("fastapi")
     from fastapi.testclient import TestClient
 
-    app = create_app(FakeAgent())
+    app = create_app(FakeAgent(), require_auth=False)
     client = TestClient(app)
     assert client.get("/health").status_code == 200
     assert client.get("/ready").status_code == 200
@@ -33,7 +33,7 @@ def test_create_app_ask_endpoint():
     pytest.importorskip("fastapi")
     from fastapi.testclient import TestClient
 
-    app = create_app(FakeAgent())
+    app = create_app(FakeAgent(), require_auth=False)
     response = TestClient(app).post("/v1/ask", json={"prompt": "What is the policy?"})
     assert response.status_code == 200
     assert response.json()["output"] == "company answer"
@@ -44,4 +44,4 @@ def test_deployment_requires_ready_agent():
         ready = False
 
     with pytest.raises(DeploymentError):
-        create_app(NotReady())
+        create_app(NotReady(), require_auth=False)

@@ -50,12 +50,12 @@ class InMemoryAuditLog:
 
 
 def _client_id(request: Any) -> str:
-    forwarded = request.headers.get("x-forwarded-for")
-    return (
-        forwarded.split(",", 1)[0].strip()
-        if forwarded
-        else request.client.host if request.client else "unknown"
-    )
+    """Return the network peer identity.
+
+    Do not trust X-Forwarded-For here: clients can spoof it unless a separately
+    configured, trusted reverse proxy strips and rewrites that header.
+    """
+    return request.client.host if request.client else "unknown"
 
 
 def create_app(
@@ -69,11 +69,12 @@ def create_app(
     audit_log: Any | None = None,
     require_auth: bool | None = None,
 ) -> Any:
-    """Create a FastAPI app with auth, rate limiting and audit hooks.
+    """Create a FastAPI app with authentication, rate limiting and audit hooks.
 
-    ``api_key`` can be supplied directly or via ``TIGERDATALAB_API_KEY``.
-    If no key is configured, authentication remains disabled for backwards
-    compatibility; internet-facing deployments should always configure one.
+    Authentication is enabled by default and requires api_key or the
+    TIGERDATALAB_API_KEY environment variable. For local tests or a deliberately
+    isolated development environment, opt out explicitly with require_auth=False.
+    Do not expose an unauthenticated app to a network.
     """
     try:
         from fastapi import Body, FastAPI, HTTPException
@@ -88,10 +89,15 @@ def create_app(
     if rate_limit < 1 or rate_window_seconds < 1:
         raise DeploymentError("rate_limit and rate_window_seconds must be positive")
 
-    configured_key = api_key or os.getenv("TIGERDATALAB_API_KEY")
-    auth_required = bool(configured_key) if require_auth is None else require_auth
+    configured_key = api_key if api_key is not None else os.getenv("TIGERDATALAB_API_KEY")
+    if configured_key is not None and not configured_key.strip():
+        raise DeploymentError("API key must not be empty or whitespace")
+    auth_required = True if require_auth is None else require_auth
     if auth_required and not configured_key:
-        raise DeploymentError("Authentication is required but no API key is configured")
+        raise DeploymentError(
+            "Authentication is enabled by default; configure api_key or "
+            "TIGERDATALAB_API_KEY, or explicitly set require_auth=False for isolated development"
+        )
 
     app = FastAPI(
         title=name or getattr(agent, "name", "TigerDataLab Agent"),
@@ -161,7 +167,10 @@ def create_app(
         prompt = payload.get("prompt")
         if not isinstance(prompt, str) or not prompt.strip():
             raise HTTPException(status_code=400, detail="prompt must be a non-empty string")
-        options = dict(payload.get("options") or {})
+        raw_options = payload.get("options", {})
+        if not isinstance(raw_options, Mapping):
+            raise HTTPException(status_code=400, detail="options must be a JSON object")
+        options = dict(raw_options)
         result = agent.ask(prompt, **options)
         audit.record(
             {
