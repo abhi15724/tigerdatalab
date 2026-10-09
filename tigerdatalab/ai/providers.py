@@ -141,6 +141,28 @@ class GeminiProvider(Provider):
         self.api_key = api_key or os.getenv(self.api_key_env)
         self.timeout = timeout
 
+    def generate_content(
+        self,
+        contents: list[dict[str, Any]],
+        model: str,
+        *,
+        system_instruction: str | None = None,
+        **kwargs: Any,
+    ) -> AIResponse:
+        """Call Gemini with native content parts, including function calls/results."""
+        if not self.api_key:
+            raise ProviderError(f"{self.api_key_env} is not configured")
+        payload: dict[str, Any] = {"contents": contents}
+        if system_instruction:
+            payload["systemInstruction"] = {"parts": [{"text": system_instruction}]}
+        for key in ("generationConfig", "safetySettings", "tools", "toolConfig"):
+            if key in kwargs:
+                payload[key] = kwargs[key]
+        url = self.endpoint_template.format(model=model) + "?key=" + self.api_key
+        req = request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+        req.add_header("Content-Type", "application/json")
+        return _http_gemini(req, model, self.timeout)
+
     def chat(self, messages: list[dict[str, str]], model: str, **kwargs: Any) -> AIResponse:
         if not self.api_key:
             raise ProviderError(f"{self.api_key_env} is not configured")

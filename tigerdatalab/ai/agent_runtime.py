@@ -11,6 +11,8 @@ from typing import Any, Awaitable, Callable, Mapping, Protocol
 from .providers import AIResponse
 from .tools import ToolRegistry
 from .permissions import PermissionPolicy
+from .observability import EventObserver
+from .security import AuditSink, ToolRateLimiter
 
 
 class AgentRuntimeError(RuntimeError):
@@ -116,6 +118,9 @@ class AgentRuntime:
         max_tokens: int | None = None,
         tool_timeout_seconds: float = 30.0,
         approval: Callable[[str, Mapping[str, Any], str], Any] | None = None,
+        observer: EventObserver | None = None,
+        audit_sink: AuditSink | None = None,
+        rate_limiter: ToolRateLimiter | None = None,
     ) -> None:
         if max_steps < 1 or max_tool_calls < 0:
             raise ValueError("max_steps must be positive and max_tool_calls non-negative")
@@ -129,6 +134,9 @@ class AgentRuntime:
         self.max_steps, self.max_tool_calls = max_steps, max_tool_calls
         self.max_tokens, self.tool_timeout_seconds = max_tokens, tool_timeout_seconds
         self.approval = approval
+        self.observer = observer
+        self.audit_sink = audit_sink
+        self.rate_limiter = rate_limiter
 
     async def _model_turn(self, messages, schemas) -> AgentTurn:
         if inspect.iscoroutinefunction(self.model):
@@ -178,12 +186,21 @@ class AgentRuntime:
     async def run_async(
         self, prompt: str, *, system: str | None = None, role: str = "default",
         conversation_id: str | None = None, context: str | None = None,
+        tenant_id: str = "default",
     ) -> AgentResult:
         if not prompt or not prompt.strip():
             raise ValueError("prompt cannot be empty")
         started = time.monotonic()
         conversation_id = conversation_id or f"ephemeral-{time.time_ns()}"
-        messages = self.memory.load(conversation_id)
+        if not tenant_id or not tenant_id.strip():
+            raise ValueError("tenant_id cannot be empty")
+        def memory_load():
+            params = inspect.signature(self.memory.load).parameters
+            return self.memory.load(conversation_id, tenant_id=tenant_id) if "tenant_id" in params else self.memory.load(conversation_id)
+        def memory_save(value):
+            params = inspect.signature(self.memory.save).parameters
+            return self.memory.save(conversation_id, value, tenant_id=tenant_id) if "tenant_id" in params else self.memory.save(conversation_id, value)
+        messages = memory_load()
         if system and not any(m.get("role") == "system" for m in messages):
             messages.insert(0, {"role": "system", "content": system})
         if context:
@@ -194,7 +211,20 @@ class AgentRuntime:
         tool_count, model_name = 0, None
 
         def emit(name, step, **details):
-            trace.append(AgentTraceEvent(name, time.time(), step, details))
+            item = AgentTraceEvent(name, time.time(), step, details)
+            trace.append(item)
+            payload = {"event": name, "timestamp": item.timestamp, "tenant_id": tenant_id,
+                       "run_id": conversation_id, "step": step, "details": details}
+            if self.observer is not None:
+                try:
+                    self.observer.record(payload)
+                except Exception:
+                    pass
+            if self.audit_sink is not None and name in {"completed", "failed", "tool_denied", "tool_error"}:
+                try:
+                    self.audit_sink.record(payload)
+                except Exception:
+                    pass
 
         try:
             for step_no in range(1, self.max_steps + 1):
@@ -211,7 +241,7 @@ class AgentRuntime:
                 emit("model_end", step_no, tool_calls=len(turn.tool_calls))
                 if not turn.tool_calls:
                     messages.append({"role": "assistant", "content": turn.text})
-                    self.memory.save(conversation_id, messages)
+                    memory_save(messages)
                     emit("completed", step_no, elapsed_ms=round((time.monotonic() - started) * 1000, 2))
                     return AgentResult("completed", turn.text, messages, tool_results, trace, usage, model_name, steps=step_no)
 
@@ -234,6 +264,17 @@ class AgentRuntime:
                     if call.name not in allowed:
                         raise AgentRuntimeError(f"Tool not permitted for role {role!r}: {call.name}")
                     emit("tool_start", step_no, tool=call.name)
+                    try:
+                        if self.rate_limiter is not None:
+                            self.rate_limiter.check(role, call.name)
+                    except Exception as exc:
+                        result = {"error": type(exc).__name__, "message": str(exc)}
+                        tool_results[call.id] = result
+                        messages.append({"role": "tool", "tool_call_id": call.id, "name": call.name,
+                                         "content": json.dumps(result)})
+                        emit("tool_denied", step_no, tool=call.name, reason="rate_limit")
+                        tool_count += 1
+                        continue
                     approved = True
                     if self.approval is not None:
                         approved = self.approval(call.name, call.arguments, role)
@@ -258,7 +299,7 @@ class AgentRuntime:
             raise AgentRuntimeError(f"Agent exceeded max_steps={self.max_steps}")
         except Exception as exc:
             emit("failed", len([e for e in trace if e.event == "model_start"]) or 1, error=type(exc).__name__)
-            self.memory.save(conversation_id, messages)
+            memory_save(messages)
             return AgentResult("failed", "", messages, tool_results, trace, usage, model_name, str(exc),
                                len([e for e in trace if e.event == "model_start"]))
 
