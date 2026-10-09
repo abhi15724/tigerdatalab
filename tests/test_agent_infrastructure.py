@@ -184,9 +184,10 @@ def test_sqlite_task_queue_retries_expired_lease_then_marks_exhausted(tmp_path):
         first = queue.claim("worker-a", lease_seconds=0.01)
         assert first is not None
         time.sleep(0.03)
-        second = queue.claim("worker-b", lease_seconds=1)
+        second = queue.claim("worker-b", lease_seconds=0.01)
         assert second is not None and second.id == task_id and second.attempts == 2
-        queue.fail(task_id, "worker-b", "temporary failure")
+        time.sleep(0.03)
+        assert queue.claim("worker-c", lease_seconds=1) is None
         failed = queue.get(task_id, tenant_id="t")
         assert failed["status"] == "failed"
         try:
