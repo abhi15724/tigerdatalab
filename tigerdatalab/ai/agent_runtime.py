@@ -181,11 +181,15 @@ class AgentRuntime:
         item = self.tools.get(name)
         if not item.enabled:
             raise AgentRuntimeError(f"Tool {name!r} is disabled")
+        try:
+            validated_arguments = item.validate_arguments(arguments)
+        except Exception as exc:
+            raise AgentRuntimeError(f"Invalid arguments for tool {name!r}: {exc}") from exc
         if inspect.iscoroutinefunction(item.function):
-            result = await asyncio.wait_for(item.function(**dict(arguments)), self.tool_timeout_seconds)
+            result = await asyncio.wait_for(item.function(**validated_arguments), self.tool_timeout_seconds)
         else:
             result = await asyncio.wait_for(
-                asyncio.to_thread(item.execute, arguments), self.tool_timeout_seconds
+                asyncio.to_thread(item.execute, validated_arguments), self.tool_timeout_seconds
             )
             if inspect.isawaitable(result):
                 result = await asyncio.wait_for(result, self.tool_timeout_seconds)

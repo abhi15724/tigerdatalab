@@ -196,3 +196,71 @@ def test_sqlite_task_queue_retries_expired_lease_then_marks_exhausted(tmp_path):
             pass
         else:
             raise AssertionError("expired worker must not complete task")
+
+
+def test_tool_schema_rejects_missing_required_and_extra_properties():
+    from tigerdatalab.ai.tools import ToolError
+
+    tool = Tool(
+        "create_invoice",
+        "Create invoice",
+        lambda invoice_id, amount: {"invoice_id": invoice_id, "amount": amount},
+        parameters={
+            "type": "object",
+            "properties": {
+                "invoice_id": {"type": "string", "minLength": 1},
+                "amount": {"type": "number", "minimum": 0},
+            },
+            "required": ["invoice_id", "amount"],
+            "additionalProperties": False,
+        },
+    )
+    assert tool.execute({"invoice_id": "INV-1", "amount": 12.5})["amount"] == 12.5
+    for invalid in ({"invoice_id": "INV-1"}, {"invoice_id": "", "amount": 2},
+                    {"invoice_id": "INV-1", "amount": -1},
+                    {"invoice_id": "INV-1", "amount": 2, "admin": True}):
+        try:
+            tool.execute(invalid)
+        except ToolError:
+            pass
+        else:
+            raise AssertionError(f"expected schema rejection for {invalid!r}")
+
+
+def test_tool_schema_checks_nested_array_types_and_rejects_non_object_arguments():
+    from tigerdatalab.ai.tools import ToolError
+
+    tool = Tool("sum", "Sum", lambda values: sum(values), parameters={
+        "type": "object",
+        "properties": {"values": {"type": "array", "items": {"type": "integer"}, "minItems": 1}},
+        "required": ["values"],
+        "additionalProperties": False,
+    })
+    assert tool.execute({"values": [1, 2]}) == 3
+    for invalid in ({"values": [1, "2"]}, {"values": []}, [1, 2]):
+        try:
+            tool.execute(invalid)
+        except ToolError:
+            pass
+        else:
+            raise AssertionError(f"expected schema rejection for {invalid!r}")
+
+
+def test_agent_runtime_validates_schema_before_async_or_sync_tool_call():
+    calls = []
+    tools = ToolRegistry()
+    tools.register(Tool(
+        "set_value", "Set a numeric value", lambda value: calls.append(value),
+        parameters={"type": "object", "properties": {"value": {"type": "integer"}},
+                    "required": ["value"], "additionalProperties": False},
+    ))
+    turns = iter([
+        AgentTurn(tool_calls=(AgentToolCall("call-1", "set_value", {"value": "not-an-integer"}),)),
+        AgentTurn(text="finished"),
+    ])
+    runtime = AgentRuntime(lambda messages, schemas: next(turns), tools,
+                           permissions=PermissionPolicy().allow("default", "set_value"))
+    result = runtime.run("set a value")
+    assert result.status == "completed"
+    assert calls == []
+    assert "Invalid arguments" in result.tool_results["call-1"]["message"]

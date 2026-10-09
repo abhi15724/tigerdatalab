@@ -9,6 +9,72 @@ class ToolError(RuntimeError):
     """Raised for invalid or unsafe tool operations."""
 
 
+def _validate_schema_value(value: Any, schema: Mapping[str, Any], path: str = "arguments") -> None:
+    """Validate the JSON Schema subset commonly used for function tools.
+
+    Supports types, enum, required/properties, additionalProperties, string
+    lengths, numeric bounds, and array lengths/items. Unknown JSON Schema
+    keywords are ignored; applications needing full JSON Schema semantics
+    should validate at their API boundary with a dedicated validator.
+    """
+    import math
+
+    if not isinstance(schema, Mapping):
+        raise ToolError(f"Invalid schema at {path}: expected an object")
+    expected = schema.get("type")
+    types = expected if isinstance(expected, list) else [expected] if expected else []
+    type_checks = {
+        "object": lambda v: isinstance(v, Mapping),
+        "array": lambda v: isinstance(v, list),
+        "string": lambda v: isinstance(v, str),
+        "boolean": lambda v: isinstance(v, bool),
+        "integer": lambda v: isinstance(v, int) and not isinstance(v, bool),
+        "number": lambda v: isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v),
+        "null": lambda v: v is None,
+    }
+    if types and not any(t in type_checks and type_checks[t](value) for t in types):
+        raise ToolError(f"Invalid {path}: expected type {' or '.join(map(str, types))}")
+    if "enum" in schema and value not in schema["enum"]:
+        raise ToolError(f"Invalid {path}: value is not an allowed enum member")
+    if isinstance(value, str):
+        if "minLength" in schema and len(value) < schema["minLength"]:
+            raise ToolError(f"Invalid {path}: string is shorter than minLength")
+        if "maxLength" in schema and len(value) > schema["maxLength"]:
+            raise ToolError(f"Invalid {path}: string exceeds maxLength")
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if not math.isfinite(value):
+            raise ToolError(f"Invalid {path}: number must be finite")
+        if "minimum" in schema and value < schema["minimum"]:
+            raise ToolError(f"Invalid {path}: number is below minimum")
+        if "maximum" in schema and value > schema["maximum"]:
+            raise ToolError(f"Invalid {path}: number exceeds maximum")
+    if isinstance(value, Mapping):
+        required = schema.get("required", [])
+        if not isinstance(required, list):
+            raise ToolError(f"Invalid schema at {path}: required must be a list")
+        missing = [key for key in required if key not in value]
+        if missing:
+            raise ToolError(f"Invalid {path}: missing required properties {missing!r}")
+        properties = schema.get("properties", {})
+        if not isinstance(properties, Mapping):
+            raise ToolError(f"Invalid schema at {path}: properties must be an object")
+        if schema.get("additionalProperties") is False:
+            extra = sorted(set(value) - set(properties))
+            if extra:
+                raise ToolError(f"Invalid {path}: unexpected properties {extra!r}")
+        for key, item in value.items():
+            if key in properties:
+                _validate_schema_value(item, properties[key], f"{path}.{key}")
+    if isinstance(value, list):
+        if "minItems" in schema and len(value) < schema["minItems"]:
+            raise ToolError(f"Invalid {path}: array is shorter than minItems")
+        if "maxItems" in schema and len(value) > schema["maxItems"]:
+            raise ToolError(f"Invalid {path}: array exceeds maxItems")
+        item_schema = schema.get("items")
+        if isinstance(item_schema, Mapping):
+            for index, item in enumerate(value):
+                _validate_schema_value(item, item_schema, f"{path}[{index}]")
+
 @dataclass(frozen=True)
 class Tool:
     """A callable exposed to an AI system with an explicit contract."""
@@ -21,11 +87,20 @@ class Tool:
     def schema(self) -> dict[str, Any]:
         return {"type": "function", "function": {"name": self.name, "description": self.description, "parameters": dict(self.parameters)}}
 
+    def validate_arguments(self, arguments: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        """Validate and normalize arguments without invoking the tool."""
+        if arguments is not None and not isinstance(arguments, Mapping):
+            raise ToolError(f"Arguments for tool '{self.name}' must be an object")
+        args = dict(arguments or {})
+        _validate_schema_value(args, self.parameters, "arguments")
+        return args
+
     def execute(self, arguments: Mapping[str, Any] | None = None) -> Any:
         if not self.enabled:
             raise ToolError(f"Tool '{self.name}' is disabled")
+        args = self.validate_arguments(arguments)
         try:
-            return self.function(**dict(arguments or {}))
+            return self.function(**args)
         except TypeError as exc:
             raise ToolError(f"Invalid arguments for tool '{self.name}': {exc}") from exc
 

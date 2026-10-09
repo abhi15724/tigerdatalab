@@ -29,7 +29,7 @@ Known constraints that must remain explicit:
 - [ ] Repeated run IDs, task retries, worker restarts, and checkpoint corruption have defined behavior.
 
 ### P0 — Security boundaries
-- [ ] Tool schemas and arguments are validated before invocation.
+- [ ] Tool schemas and arguments are validated before invocation. A dependency-free JSON Schema subset validator is implemented for common object/array/type/enum/bounds constraints; validate required schemas and edge cases before marking this gate complete.
 - [ ] Tool permissions are deny-by-default and checked at execution time, not only when tools are advertised to a model.
 - [ ] Approval is required for destructive, external, financial, or otherwise high-impact tools.
 - [x] Conversation-memory adapters namespace records by tenant and conversation; verify tenant scoping separately for checkpoint, task, audit, and retrieval stores before enabling multi-tenancy across those components.
