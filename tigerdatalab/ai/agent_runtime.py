@@ -11,6 +11,8 @@ from typing import Any, Awaitable, Callable, Mapping, Protocol
 from .providers import AIResponse
 from .tools import ToolRegistry
 from .permissions import PermissionPolicy
+from .observability import EventObserver
+from .security import AuditSink, ToolRateLimiter
 
 
 class AgentRuntimeError(RuntimeError):
@@ -128,7 +130,7 @@ class AgentRuntime:
         self.memory = memory or InMemoryConversationMemory()
         self.max_steps, self.max_tool_calls = max_steps, max_tool_calls
         self.max_tokens, self.tool_timeout_seconds = max_tokens, tool_timeout_seconds
-        self.approval = approval
+        self.approval = approval\n        self.observer = observer\n        self.audit_sink = audit_sink\n        self.rate_limiter = rate_limiter
 
     async def _model_turn(self, messages, schemas) -> AgentTurn:
         if inspect.iscoroutinefunction(self.model):
@@ -211,7 +213,7 @@ class AgentRuntime:
                 emit("model_end", step_no, tool_calls=len(turn.tool_calls))
                 if not turn.tool_calls:
                     messages.append({"role": "assistant", "content": turn.text})
-                    self.memory.save(conversation_id, messages)
+                    memory_save(messages)
                     emit("completed", step_no, elapsed_ms=round((time.monotonic() - started) * 1000, 2))
                     return AgentResult("completed", turn.text, messages, tool_results, trace, usage, model_name, steps=step_no)
 
