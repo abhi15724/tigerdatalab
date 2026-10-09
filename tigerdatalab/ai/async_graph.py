@@ -292,9 +292,9 @@ class AsyncGraph:
                 if name in resolved:
                     continue
                 parents = incoming[name]
-                if name == self.start:
+                if not parents:
                     ready.append(name)
-                elif parents and all(edge.source in resolved for edge in parents):
+                elif all(edge.source in resolved for edge in parents):
                     if any(self._edge_id(edge) in active_edges for edge in parents):
                         ready.append(name)
                     else:
