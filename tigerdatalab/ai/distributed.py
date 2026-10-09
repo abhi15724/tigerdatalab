@@ -155,3 +155,65 @@ class SQLiteTaskQueue:
 
     def __exit__(self, *_exc: object) -> None:
         self.close()
+
+
+
+class TaskWorker:
+    """Execute registered task handlers with lease ownership and bounded retries.
+
+    A handler receives the task payload and must return a JSON-serializable
+    mapping. Handlers should be idempotent: a worker can lose its lease after
+    an external side effect and another worker may retry the task.
+    """
+
+    def __init__(self, queue: TaskQueue, worker_id: str, handlers: Mapping[str, Any]) -> None:
+        if not worker_id.strip():
+            raise ValueError("worker_id is required")
+        self.queue, self.worker_id = queue, worker_id
+        self.handlers = dict(handlers)
+
+    def process_once(self, *, lease_seconds: float = 60, retry_delay: float = 0) -> bool:
+        task = self.queue.claim(self.worker_id, lease_seconds=lease_seconds)
+        if task is None:
+            return False
+        handler = self.handlers.get(task.task_type)
+        if handler is None:
+            self.queue.fail(task.id, self.worker_id, f"No handler for task type {task.task_type!r}")
+            return True
+        try:
+            result = handler(dict(task.payload))
+            if hasattr(result, "__await__"):
+                raise QueueError("Async handler used in sync worker; use process_once_async()")
+            if not isinstance(result, Mapping):
+                raise QueueError("Task handler must return a mapping")
+            self.queue.complete(task.id, self.worker_id, result)
+        except Exception as exc:
+            try:
+                self.queue.fail(task.id, self.worker_id, f"{type(exc).__name__}: {exc}", retry_delay=retry_delay)
+            except QueueError:
+                # The lease may have expired while the handler ran; never overwrite
+                # a newer worker's ownership or result.
+                raise
+        return True
+
+    async def process_once_async(self, *, lease_seconds: float = 60, retry_delay: float = 0) -> bool:
+        import asyncio
+        task = await asyncio.to_thread(self.queue.claim, self.worker_id, lease_seconds=lease_seconds)
+        if task is None:
+            return False
+        handler = self.handlers.get(task.task_type)
+        if handler is None:
+            await asyncio.to_thread(self.queue.fail, task.id, self.worker_id,
+                                    f"No handler for task type {task.task_type!r}")
+            return True
+        try:
+            result = handler(dict(task.payload))
+            if hasattr(result, "__await__"):
+                result = await result
+            if not isinstance(result, Mapping):
+                raise QueueError("Task handler must return a mapping")
+            await asyncio.to_thread(self.queue.complete, task.id, self.worker_id, result)
+        except Exception as exc:
+            await asyncio.to_thread(self.queue.fail, task.id, self.worker_id,
+                                    f"{type(exc).__name__}: {exc}", retry_delay=retry_delay)
+        return True
