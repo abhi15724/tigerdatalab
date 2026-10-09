@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/agent-factory
+      - feat/tigerdatalab-2-foundation
   pull_request:
     branches:
       - main
@@ -33,7 +34,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e '.[large]' pytest
-      - name: Run Agent Factory tests
-        run: python -m pytest -q tests/test_agent_factory.py
+      - name: Run focused AI framework tests
+        run: python -m pytest -q tests/test_agent_factory.py tests/test_ai_graph.py tests/test_async_graph.py tests/test_agent_runtime.py
       - name: Run full test suite
         run: python -m pytest -q
