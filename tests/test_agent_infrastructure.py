@@ -173,3 +173,25 @@ def test_inspect_graph_run_reads_checkpoint_without_execution():
     assert snapshot["current_node"] == "step_b"
     assert snapshot["completed_nodes"] == ["step_a"]
     assert inspect_graph_run(store, "missing") is None
+
+
+
+def test_sqlite_task_queue_retries_expired_lease_then_marks_exhausted(tmp_path):
+    import time
+    from tigerdatalab.ai.distributed import QueueError
+    with SQLiteTaskQueue(tmp_path / "lease.sqlite3") as queue:
+        task_id = queue.enqueue("work", {}, tenant_id="t", max_attempts=2)
+        first = queue.claim("worker-a", lease_seconds=0.01)
+        assert first is not None
+        time.sleep(0.03)
+        second = queue.claim("worker-b", lease_seconds=1)
+        assert second is not None and second.id == task_id and second.attempts == 2
+        queue.fail(task_id, "worker-b", "temporary failure")
+        failed = queue.get(task_id, tenant_id="t")
+        assert failed["status"] == "failed"
+        try:
+            queue.complete(task_id, "worker-a", {"should": "not work"})
+        except QueueError:
+            pass
+        else:
+            raise AssertionError("expired worker must not complete task")
