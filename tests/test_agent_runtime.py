@@ -1,7 +1,8 @@
 import asyncio
 import json
 
-from tigerdatalab.ai.agent_runtime import AgentRuntime, AgentToolCall, AgentTurn, InMemoryConversationMemory
+from tigerdatalab.ai.agent_runtime import AgentRuntime, AgentToolCall, AgentTurn, InMemoryConversationMemory, openai_compatible_agent_model
+from tigerdatalab.ai.providers import AIResponse, Provider
 from tigerdatalab.ai.permissions import PermissionPolicy
 from tigerdatalab.ai.tools import Tool, ToolRegistry
 
@@ -83,3 +84,31 @@ def test_agent_runtime_supports_async_model_and_tool():
     result = asyncio.run(runtime.run_async("lookup x"))
     assert result.status == "completed" and result.output == "found"
     assert result.tool_results["id"] == {"item": "x"}
+
+
+
+def test_openai_compatible_provider_helper_wires_tools():
+    class FakeProvider(Provider):
+        name = "fake"
+        def __init__(self):
+            self.calls = 0
+        def chat(self, messages, model, **kwargs):
+            self.calls += 1
+            assert kwargs["tools"][0]["function"]["name"] == "add"
+            if self.calls == 1:
+                raw = {"choices": [{"message": {
+                    "role": "assistant", "content": None,
+                    "tool_calls": [{"id": "c1", "type": "function", "function": {
+                        "name": "add", "arguments": "{\"a\": 3, \"b\": 4}"
+                    }}]
+                }}]}
+                return AIResponse(text="", model=model, raw=raw)
+            return AIResponse(text="7", model=model, raw={"choices": [{"message": {"role": "assistant", "content": "7"}}]})
+
+    provider = FakeProvider()
+    model = openai_compatible_agent_model(provider, "fake-model")
+    runtime = AgentRuntime(model, make_tools(), permissions=PermissionPolicy().allow("default", "add"))
+    result = runtime.run("add 3 and 4")
+    assert result.status == "completed"
+    assert result.output == "7"
+    assert result.tool_results["c1"] == 7
