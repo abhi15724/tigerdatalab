@@ -20,6 +20,31 @@ result = runtime.run("Check SKU-1")
 print(result.status, result.output)
 ```
 
+## Connect an OpenAI-compatible provider
+
+```python
+from tigerdatalab.ai import (
+    AgentRuntime, PermissionPolicy, Tool, ToolRegistry,
+    openai_compatible_agent_model,
+)
+from tigerdatalab.ai.providers import OpenRouterProvider
+
+tools = ToolRegistry()
+tools.register(Tool("lookup", "Look up a product", lambda sku: {"sku": sku, "stock": 8}))
+model = openai_compatible_agent_model(
+    OpenRouterProvider(),
+    model="YOUR_OPENROUTER_MODEL",
+)
+runtime = AgentRuntime(
+    model, tools,
+    permissions=PermissionPolicy().allow("default", "lookup"),
+    max_steps=8, max_tool_calls=12, max_tokens=4000,
+)
+result = runtime.run("Check SKU-1")
+```
+
+This helper uses the OpenAI-compatible chat-completions tool schema. Native Anthropic and Gemini function calling need provider-specific adapters.
+
 ## Guardrails and limitations
 
 - Only explicitly registered tools can run; role permissions deny tools by default.
