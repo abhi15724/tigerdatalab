@@ -1,14 +1,16 @@
-# Graph Workflows
+# Async and Parallel Graph Workflows
 
-## Design target
-Use `tigerdatalab.ai.Graph` for branching or resumable workflows; use `Workflow` for simple linear sequences.
+- Use `AsyncGraph` for DAGs with independent nodes that can run concurrently; use `Graph` for synchronous routing and bounded cycles.
+- Always set `max_concurrency` based on provider quotas and downstream limits.
+- Return mapping outputs from nodes. Nodes receive isolated snapshots; do not mutate shared state.
+- Parallel nodes must not write the same output key; conflicts intentionally fail the run.
+- Retries require `retry_safe=True`. Use idempotency keys for external side effects.
+- Set `timeout_seconds` for network/provider calls. A timeout does not forcibly stop a synchronous function already running in a worker thread.
+- AsyncGraph is DAG-only. Validate graph structure before execution.
+- Checkpoint state must be JSON-serializable when using SQLite. Never put credentials or raw secrets in state.
+- The caller must authenticate/authorize approval decisions. This package does not provide reviewer identity or an approval UI.
+- Add tests for fan-out, join, conditional routes, async actions, timeouts, retry behavior, output conflicts, approvals, persistence and resume.
 
-## Required semantics
-- Validate named nodes/edges and ambiguous fallback routes.
-- Bound execution with `max_steps`.
-- Retries require explicit `retry_safe=True`; do not retry side effects blindly.
-- Use `SQLiteCheckpointStore` for restart persistence on a durable filesystem; the default in-memory store is only process-local.
-- Approval-gated nodes must pause before action execution. The calling application must authenticate/authorize the reviewer before supplying `approvals={node_name: True|False}`.
-- Validate graph name/version before resume. State stored in SQLite must be JSON-serializable.
-- Add tests for routing, cycles, failures, retry policy, persistence after reopening the database, approvals and rejection routing.
-- Never claim exactly-once side effects, authenticated approval UI, async/parallel execution or distributed coordination unless separately implemented and tested.
+- AsyncGraph supports multiple root nodes for parallel fan-out; independent roots are scheduled together up to max_concurrency.
+- Keep async graph node outputs disjoint; a duplicate output key in one parallel wave is a hard failure.
+- The framework agent loop lives in AgentRuntime; provider-specific tool-call wire formats must be normalized at the adapter boundary.

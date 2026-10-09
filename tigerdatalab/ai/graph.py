@@ -31,6 +31,7 @@ class GraphNode:
     description: str = ""
     approval_required: bool = False
     approval_key: str | None = None
+    timeout_seconds: float | None = None
 
     def __post_init__(self) -> None:
         if not self.name.strip():
@@ -41,6 +42,8 @@ class GraphNode:
             raise ValueError("Retries require retry_safe=True")
         if self.approval_key is not None and not self.approval_key.strip():
             raise ValueError("approval_key cannot be empty")
+        if self.timeout_seconds is not None and self.timeout_seconds <= 0:
+            raise ValueError("timeout_seconds must be positive")
 
 
 @dataclass(frozen=True)
