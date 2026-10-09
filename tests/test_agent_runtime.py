@@ -132,7 +132,7 @@ def test_agent_runtime_model_timeout_is_bounded():
     runtime = AgentRuntime(slow_model, model_timeout_seconds=0.001)
     result = asyncio.run(runtime.run_async("hello"))
     assert result.status == "failed"
-    assert "TimeoutError" in result.error
+    assert "Model call timed out after" in result.error
 
 
 def test_agent_runtime_rejects_non_positive_model_timeout():
