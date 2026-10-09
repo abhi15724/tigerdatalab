@@ -40,12 +40,17 @@ def test_agent_runtime_approval_gate_prevents_tool_execution():
     ran = {"value": False}
     tools = ToolRegistry()
     tools.register(Tool("danger", "Dangerous", lambda: ran.__setitem__("value", True)))
+    calls = {"n": 0}
     def model(messages, schemas):
-        return AgentTurn(tool_calls=(AgentToolCall("x", "danger", {}),))
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return AgentTurn(tool_calls=(AgentToolCall("x", "danger", {}),))
+        return AgentTurn(text="I did not run the action because approval was denied.")
     runtime = AgentRuntime(model, tools, permissions=PermissionPolicy().allow("default", "danger"),
                            approval=lambda name, args, role: False)
     result = runtime.run("run dangerous action")
     assert result.status == "completed" and ran["value"] is False
+    assert "approval was denied" in result.output
     assert any(e.event == "tool_denied" for e in result.trace)
 
 
