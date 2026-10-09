@@ -92,6 +92,22 @@ print(to_mermaid(graph))
 
 The renderer inspects the graph definition only. It never executes graph actions or condition callbacks. Use the output in Mermaid-compatible documentation or preview tools. Interactive breakpoints, step-through execution and a visual graph editor are not part of this implementation yet.
 
+## Isolated command execution
+
+```python
+from tigerdatalab.ai import DockerSandbox
+
+sandbox = DockerSandbox(
+    image="python:3.12-slim",  # pin a reviewed image digest in production
+    memory="256m", cpus="1.0", pids_limit=64,
+    default_timeout_seconds=10, max_output_bytes=64000,
+)
+result = sandbox.run(["python", "-c", "print('isolated')"])
+print(result.returncode, result.stdout)
+```
+
+The Docker runner uses argv without a shell, disables networking, mounts no host paths, makes the container root filesystem read-only, drops Linux capabilities, and sets process/memory/CPU/time/output limits. Docker must be installed and the selected image must already be present (`--pull=never`). This is defense-in-depth, not a guarantee against every container escape; isolate the Docker daemon and host, pin reviewed image digests, and use a dedicated VM/managed sandbox for hostile workloads. Never expose Docker socket access to an untrusted agent.
+
 ## Security checklist before internet-facing deployment
 
 - Require authentication; authenticate and authorize tenant access on every request.
