@@ -112,3 +112,29 @@ def test_openai_compatible_provider_helper_wires_tools():
     assert result.status == "completed"
     assert result.output == "7"
     assert result.tool_results["c1"] == 7
+
+
+def test_in_memory_memory_isolated_by_tenant():
+    memory = InMemoryConversationMemory()
+    memory.save("shared-id", [{"role": "user", "content": "tenant A"}], tenant_id="tenant-a")
+    memory.save("shared-id", [{"role": "user", "content": "tenant B"}], tenant_id="tenant-b")
+    assert memory.load("shared-id", tenant_id="tenant-a")[0]["content"] == "tenant A"
+    assert memory.load("shared-id", tenant_id="tenant-b")[0]["content"] == "tenant B"
+    assert memory.load("shared-id") == []
+
+
+def test_agent_runtime_model_timeout_is_bounded():
+    async def slow_model(messages, schemas):
+        await asyncio.sleep(0.05)
+        return AgentTurn(text="too late")
+
+    runtime = AgentRuntime(slow_model, model_timeout_seconds=0.001)
+    result = asyncio.run(runtime.run_async("hello"))
+    assert result.status == "failed"
+    assert "TimeoutError" in result.error
+
+
+def test_agent_runtime_rejects_non_positive_model_timeout():
+    import pytest
+    with pytest.raises(ValueError, match="model_timeout_seconds"):
+        AgentRuntime(lambda messages, schemas: AgentTurn(text="ok"), model_timeout_seconds=0)
