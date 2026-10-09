@@ -90,7 +90,7 @@ from tigerdatalab.ai import to_mermaid
 print(to_mermaid(graph))
 ```
 
-The renderer inspects the graph definition only. It never executes graph actions or condition callbacks. Use the output in Mermaid-compatible documentation or preview tools. Interactive breakpoints, step-through execution and a visual graph editor are not part of this implementation yet.
+The renderer inspects the graph definition only. It never executes graph actions or condition callbacks. Use the output in Mermaid-compatible documentation or preview tools. Use `inspect_graph_run(checkpoint_store, run_id)` to inspect a persisted run's status, current node, completed nodes and checkpoint state without executing the graph. Redact sensitive values before displaying snapshots. A graphical step-through editor and interactive breakpoints are not included yet.
 
 ## Isolated command execution
 
