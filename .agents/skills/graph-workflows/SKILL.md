@@ -1,16 +1,14 @@
 # Graph Workflows
 
 ## Design target
-Evolve the current linear `Workflow` into a resumable graph runtime only through small, tested increments. Preserve the simple linear path for ordinary tasks.
+Use `tigerdatalab.ai.Graph` for branching or resumable workflows; use `Workflow` for simple linear sequences.
 
-## Required semantics for graph features
-- Explicit typed state and named nodes.
-- Declared edges and conditional routing with validation for missing nodes.
-- Bounded steps/iterations, per-node timeout policy, and clear failure state.
-- Retry only where the operation is safe to repeat; avoid blind retries for side effects.
-- Checkpoint state before/after expensive or side-effecting operations.
-- Resume from validated checkpoints and record the graph version.
-- Approval gates for sensitive actions; approvals must be enforced by the action handler.
-- Test cycles, dead ends, exceptions, resume behavior and deterministic branch selection.
-
-Do not claim durable execution, parallel scheduling or distributed workers until each capability exists and is tested.
+## Required semantics
+- Validate named nodes/edges and ambiguous fallback routes.
+- Bound execution with `max_steps`.
+- Retries require explicit `retry_safe=True`; do not retry side effects blindly.
+- Use `SQLiteCheckpointStore` for restart persistence on a durable filesystem; the default in-memory store is only process-local.
+- Approval-gated nodes must pause before action execution. The calling application must authenticate/authorize the reviewer before supplying `approvals={node_name: True|False}`.
+- Validate graph name/version before resume. State stored in SQLite must be JSON-serializable.
+- Add tests for routing, cycles, failures, retry policy, persistence after reopening the database, approvals and rejection routing.
+- Never claim exactly-once side effects, authenticated approval UI, async/parallel execution or distributed coordination unless separately implemented and tested.
