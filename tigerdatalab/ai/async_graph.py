@@ -244,7 +244,7 @@ class AsyncGraph:
         else:
             state = dict(inputs or {})
             meta = {"resolved": [], "active_edges": [], "skipped": []}
-            completed, steps = [], []
+            completed, steps = [], 0
 
         resolved = set(meta.get("resolved", completed))
         active_edges = set(meta.get("active_edges", []))
