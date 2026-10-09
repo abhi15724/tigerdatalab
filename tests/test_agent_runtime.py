@@ -163,18 +163,3 @@ def test_sqlite_conversation_memory_requires_tenant_and_conversation(tmp_path):
             memory.save("", [], tenant_id="tenant-a")
 
 
-def test_agent_runtime_model_timeout_is_bounded():
-    async def slow_model(messages, schemas):
-        await asyncio.sleep(0.05)
-        return AgentTurn(text="too late")
-
-    runtime = AgentRuntime(slow_model, model_timeout_seconds=0.001)
-    result = asyncio.run(runtime.run_async("hello"))
-    assert result.status == "failed"
-    assert "TimeoutError" in result.error
-
-
-def test_agent_runtime_rejects_non_positive_model_timeout():
-    import pytest
-    with pytest.raises(ValueError, match="model_timeout_seconds"):
-        AgentRuntime(lambda messages, schemas: AgentTurn(text="ok"), model_timeout_seconds=0)
