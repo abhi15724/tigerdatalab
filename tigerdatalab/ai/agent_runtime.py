@@ -58,6 +58,26 @@ class AgentModel(Protocol):
     def __call__(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> Any: ...
 
 
+def openai_compatible_agent_model(provider, model: str, **options):
+    """Adapt an OpenAI-compatible Provider for AgentRuntime.
+
+    Works with providers implementing the OpenAI chat-completions tool schema,
+    including compatible hosted endpoints. Native Anthropic/Gemini function
+    calling requires a provider-specific adapter.
+    """
+    if not model or not model.strip():
+        raise ValueError("model cannot be empty")
+
+    def call(messages: list[dict[str, Any]], schemas: list[dict[str, Any]]) -> AIResponse:
+        kwargs = dict(options)
+        if schemas:
+            kwargs.setdefault("tools", schemas)
+            kwargs.setdefault("tool_choice", "auto")
+        return provider.chat(messages, model=model, **kwargs)
+
+    return call
+
+
 class ConversationMemory(Protocol):
     def load(self, conversation_id: str) -> list[dict[str, Any]]: ...
     def save(self, conversation_id: str, messages: list[dict[str, Any]]) -> None: ...
