@@ -10,3 +10,7 @@
 - Checkpoint state must be JSON-serializable when using SQLite. Never put credentials or raw secrets in state.
 - The caller must authenticate/authorize approval decisions. This package does not provide reviewer identity or an approval UI.
 - Add tests for fan-out, join, conditional routes, async actions, timeouts, retry behavior, output conflicts, approvals, persistence and resume.
+
+- AsyncGraph supports multiple root nodes for parallel fan-out; independent roots are scheduled together up to max_concurrency.
+- Keep async graph node outputs disjoint; a duplicate output key in one parallel wave is a hard failure.
+- The framework agent loop lives in AgentRuntime; provider-specific tool-call wire formats must be normalized at the adapter boundary.
