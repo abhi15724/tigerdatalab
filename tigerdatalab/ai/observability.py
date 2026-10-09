@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import time
 from collections import Counter
 from threading import RLock
@@ -63,7 +64,7 @@ class RuntimeTelemetry:
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
             ordered = sorted(self._latencies_ms)
-            p95 = ordered[min(len(ordered) - 1, int(0.95 * len(ordered)))] if ordered else None
+            p95 = ordered[max(0, math.ceil(0.95 * len(ordered)) - 1)] if ordered else None
             return {
                 "events": dict(self._events),
                 "tokens": dict(self._tokens),
