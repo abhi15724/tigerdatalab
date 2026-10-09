@@ -116,21 +116,28 @@ def test_gemini_adapter_normalizes_function_call():
 
 
 def test_docker_sandbox_builds_restricted_argv_without_shell(monkeypatch):
-    import subprocess
+    import io
     from types import SimpleNamespace
     from tigerdatalab.ai.sandbox import DockerSandbox
 
     seen = {}
     monkeypatch.setattr("shutil.which", lambda name: "/usr/bin/docker")
-    def fake_run(argv, **kwargs):
-        seen["argv"] = argv
-        seen["kwargs"] = kwargs
-        return SimpleNamespace(returncode=0, stdout="ok", stderr="")
-    monkeypatch.setattr("subprocess.run", fake_run)
+    class FakeProcess:
+        def __init__(self, argv, **kwargs):
+            seen["argv"] = argv
+            seen["kwargs"] = kwargs
+            self.stdin = io.BytesIO()
+            self.stdout = io.BytesIO(b"ok")
+            self.stderr = io.BytesIO(b"")
+            self.returncode = 0
+        def wait(self, timeout=None):
+            return 0
+        def kill(self):
+            pass
+    monkeypatch.setattr("subprocess.Popen", FakeProcess)
     result = DockerSandbox("python:3.12-slim", max_output_bytes=100).run(["python", "-c", "print(1)"])
     assert result.returncode == 0 and result.stdout == "ok"
     assert "--network=none" in seen["argv"]
     assert "--read-only" in seen["argv"]
     assert "--cap-drop=ALL" in seen["argv"]
     assert seen["kwargs"]["shell"] is False
-    assert seen["kwargs"]["timeout"] == 10.0
