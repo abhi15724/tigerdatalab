@@ -2,6 +2,7 @@ import asyncio
 import json
 
 from tigerdatalab.ai.agent_runtime import AgentRuntime, AgentToolCall, AgentTurn, InMemoryConversationMemory, openai_compatible_agent_model
+from tigerdatalab.ai.durable_memory import SQLiteConversationMemory
 from tigerdatalab.ai.providers import AIResponse, Provider
 from tigerdatalab.ai.permissions import PermissionPolicy
 from tigerdatalab.ai.tools import Tool, ToolRegistry
@@ -112,3 +113,53 @@ def test_openai_compatible_provider_helper_wires_tools():
     assert result.status == "completed"
     assert result.output == "7"
     assert result.tool_results["c1"] == 7
+
+
+def test_in_memory_memory_isolated_by_tenant():
+    memory = InMemoryConversationMemory()
+    memory.save("shared-id", [{"role": "user", "content": "tenant A"}], tenant_id="tenant-a")
+    memory.save("shared-id", [{"role": "user", "content": "tenant B"}], tenant_id="tenant-b")
+    assert memory.load("shared-id", tenant_id="tenant-a")[0]["content"] == "tenant A"
+    assert memory.load("shared-id", tenant_id="tenant-b")[0]["content"] == "tenant B"
+    assert memory.load("shared-id") == []
+
+
+def test_agent_runtime_model_timeout_is_bounded():
+    async def slow_model(messages, schemas):
+        await asyncio.sleep(0.05)
+        return AgentTurn(text="too late")
+
+    runtime = AgentRuntime(slow_model, model_timeout_seconds=0.001)
+    result = asyncio.run(runtime.run_async("hello"))
+    assert result.status == "failed"
+    assert "Model call timed out after" in result.error
+
+
+def test_agent_runtime_rejects_non_positive_model_timeout():
+    import pytest
+    with pytest.raises(ValueError, match="model_timeout_seconds"):
+        AgentRuntime(lambda messages, schemas: AgentTurn(text="ok"), model_timeout_seconds=0)
+
+
+def test_sqlite_conversation_memory_persists_and_isolates_tenants(tmp_path):
+    database = tmp_path / "memory.sqlite3"
+    with SQLiteConversationMemory(database) as memory:
+        memory.save("shared", [{"role": "user", "content": "A"}], tenant_id="tenant-a")
+        memory.save("shared", [{"role": "user", "content": "B"}], tenant_id="tenant-b")
+        assert memory.load("shared", tenant_id="tenant-a")[0]["content"] == "A"
+        assert memory.load("shared", tenant_id="tenant-b")[0]["content"] == "B"
+
+    with SQLiteConversationMemory(database) as reopened:
+        assert reopened.load("shared", tenant_id="tenant-a")[0]["content"] == "A"
+        assert reopened.load("shared", tenant_id="tenant-b")[0]["content"] == "B"
+
+
+def test_sqlite_conversation_memory_requires_tenant_and_conversation(tmp_path):
+    import pytest
+    with SQLiteConversationMemory(tmp_path / "memory.sqlite3") as memory:
+        with pytest.raises(ValueError, match="tenant_id"):
+            memory.load("c1", tenant_id="")
+        with pytest.raises(ValueError, match="conversation_id"):
+            memory.save("", [], tenant_id="tenant-a")
+
+

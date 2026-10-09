@@ -81,21 +81,29 @@ def openai_compatible_agent_model(provider, model: str, **options):
 
 
 class ConversationMemory(Protocol):
-    def load(self, conversation_id: str) -> list[dict[str, Any]]: ...
-    def save(self, conversation_id: str, messages: list[dict[str, Any]]) -> None: ...
+    def load(self, conversation_id: str, *, tenant_id: str = "default") -> list[dict[str, Any]]: ...
+    def save(self, conversation_id: str, messages: list[dict[str, Any]], *, tenant_id: str = "default") -> None: ...
 
 
 class InMemoryConversationMemory:
-    """Process-local memory. Replace with a durable, tenant-scoped store in production."""
+    """Process-local, tenant-scoped memory for development and tests only.
+
+    Production deployments should use a durable adapter with access controls,
+    retention limits, encryption and backup/restore procedures.
+    """
 
     def __init__(self) -> None:
-        self._items: dict[str, list[dict[str, Any]]] = {}
+        self._items: dict[tuple[str, str], list[dict[str, Any]]] = {}
 
-    def load(self, conversation_id: str) -> list[dict[str, Any]]:
-        return json.loads(json.dumps(self._items.get(conversation_id, [])))
+    def load(self, conversation_id: str, *, tenant_id: str = "default") -> list[dict[str, Any]]:
+        key = (tenant_id, conversation_id)
+        return json.loads(json.dumps(self._items.get(key, [])))
 
-    def save(self, conversation_id: str, messages: list[dict[str, Any]]) -> None:
-        self._items[conversation_id] = json.loads(json.dumps(messages))
+    def save(
+        self, conversation_id: str, messages: list[dict[str, Any]], *, tenant_id: str = "default"
+    ) -> None:
+        key = (tenant_id, conversation_id)
+        self._items[key] = json.loads(json.dumps(messages))
 
 
 class AgentRuntime:
@@ -117,6 +125,7 @@ class AgentRuntime:
         max_tool_calls: int = 16,
         max_tokens: int | None = None,
         tool_timeout_seconds: float = 30.0,
+        model_timeout_seconds: float = 60.0,
         approval: Callable[[str, Mapping[str, Any], str], Any] | None = None,
         observer: EventObserver | None = None,
         audit_sink: AuditSink | None = None,
@@ -128,11 +137,14 @@ class AgentRuntime:
             raise ValueError("max_tokens must be positive")
         if tool_timeout_seconds <= 0:
             raise ValueError("tool_timeout_seconds must be positive")
+        if model_timeout_seconds <= 0:
+            raise ValueError("model_timeout_seconds must be positive")
         self.model, self.tools = model, tools or ToolRegistry()
         self.permissions = permissions or PermissionPolicy()
         self.memory = memory or InMemoryConversationMemory()
         self.max_steps, self.max_tool_calls = max_steps, max_tool_calls
         self.max_tokens, self.tool_timeout_seconds = max_tokens, tool_timeout_seconds
+        self.model_timeout_seconds = model_timeout_seconds
         self.approval = approval
         self.observer = observer
         self.audit_sink = audit_sink
@@ -229,10 +241,17 @@ class AgentRuntime:
         try:
             for step_no in range(1, self.max_steps + 1):
                 emit("model_start", step_no)
-                turn = await self._model_turn(messages, schemas)
+                try:
+                    turn = await asyncio.wait_for(
+                        self._model_turn(messages, schemas), timeout=self.model_timeout_seconds
+                    )
+                except asyncio.TimeoutError as exc:
+                    raise AgentRuntimeError(
+                        f"Model call timed out after {self.model_timeout_seconds:g} seconds"
+                    ) from exc
                 model_name = turn.model or model_name
                 for key, value in turn.usage.items():
-                    if isinstance(value, (int, float)) and value >= 0:
+                    if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0:
                         usage[key] = usage.get(key, 0) + int(value)
                 if self.max_tokens is not None:
                     total = usage.get("total_tokens", usage.get("input_tokens", 0) + usage.get("output_tokens", 0))
