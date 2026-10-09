@@ -69,7 +69,7 @@ def test_graph_debugger_is_standalone_read_only_html(tmp_path):
     assert "<!doctype html>" in page.lower()
     assert "Produce x" in page
     assert "graph-data" in page
-    assert "does not execute graph actions" in page
+    assert "never executes graph actions" in page
     assert json.loads(page.split('<script type="application/json" id="graph-data">')[1].split("</script>")[0])["graph"] == "inspect"
     store.close()
 
