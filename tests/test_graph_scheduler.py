@@ -80,3 +80,29 @@ def test_scheduler_rejects_unknown_graph(tmp_path):
                                               worker_id="worker")
         with pytest.raises(GraphSchedulerError, match="not registered"):
             scheduler.submit("unknown", tenant_id="t")
+
+
+def test_graph_checkpoints_are_isolated_by_tenant(tmp_path):
+    store = SQLiteCheckpointStore(tmp_path / "checkpoints.sqlite3")
+    graph = Graph("tenant-approval", [
+        GraphNode("approve", lambda state: {"action": "ready"}, approval_required=True),
+        GraphNode("finish", lambda state: {"finished": state["approve_approved"]}),
+    ], checkpoint_store=store)
+    graph.add_edge("approve", "finish")
+    with SQLiteTaskQueue(tmp_path / "tasks.sqlite3") as queue:
+        scheduler = DistributedGraphScheduler(queue, {"tenant-approval": graph}, worker_id="worker")
+        submitted_a = scheduler.submit("tenant-approval", tenant_id="tenant-a", run_id="shared-run")
+        scheduler.process_once()
+        with pytest.raises(GraphSchedulerError, match="in this tenant"):
+            scheduler.resume("tenant-approval", "shared-run", tenant_id="tenant-b", approvals={"approve": True})
+
+        # A different tenant can use the same public run ID without colliding
+        # with or reading tenant A's checkpoint.
+        submitted_b = scheduler.submit("tenant-approval", tenant_id="tenant-b", run_id="shared-run")
+        assert submitted_a["run_id"] == submitted_b["run_id"]
+        scheduler.process_once()
+        resumed_a = scheduler.resume("tenant-approval", "shared-run", tenant_id="tenant-a", approvals={"approve": True})
+        scheduler.process_once()
+        assert scheduler.status(resumed_a["task_id"], tenant_id="tenant-a")["result"]["status"] == "completed"
+        assert scheduler.status(submitted_b["task_id"], tenant_id="tenant-b")["result"]["status"] == "waiting_for_approval"
+    store.close()
