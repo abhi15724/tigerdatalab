@@ -13,8 +13,6 @@ from .tools import ToolRegistry
 from .permissions import PermissionPolicy
 from .observability import EventObserver
 from .security import AuditSink, ToolRateLimiter
-from .observability import EventObserver
-from .security import AuditSink, ToolRateLimiter
 
 
 class AgentRuntimeError(RuntimeError):
