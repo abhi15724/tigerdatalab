@@ -59,7 +59,8 @@ class DistributedGraphScheduler:
             if name != graph.name:
                 raise ValueError(f"Graph registry key {name!r} does not match graph.name {graph.name!r}")
             graph.validate()
-        self._worker = TaskWorker(queue, worker_id, {self.TASK_TYPE: self._execute_task})
+        self._worker = TaskWorker(queue, worker_id, {self.TASK_TYPE: self._execute_task_sync})
+        self._async_worker = TaskWorker(queue, worker_id, {self.TASK_TYPE: self._execute_task})
 
     def submit(
         self,
@@ -135,6 +136,29 @@ class DistributedGraphScheduler:
             return self.graphs[graph_name]
         except KeyError as exc:
             raise GraphSchedulerError(f"Graph {graph_name!r} is not registered") from exc
+
+    def _execute_task_sync(self, payload: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Synchronous queue handler; run async graphs in a dedicated event loop."""
+        graph = self._get_graph(str(payload.get("graph_name", "")))
+        if isinstance(graph, AsyncGraph):
+            return asyncio.run(self._execute_task(payload))
+        if payload.get("graph_version") != graph.version:
+            raise GraphSchedulerError("Queued graph version does not match registered graph")
+        run_id = str(payload["graph_run_id"])
+        result = graph.run(
+            inputs=payload.get("inputs") or None,
+            run_id=run_id,
+            resume=bool(payload.get("resume")),
+            approvals=payload.get("approvals") or None,
+        )
+        summary = {
+            "graph_name": result.graph, "run_id": run_id, "status": result.status,
+            "steps": result.steps, "executed_nodes": list(result.executed_nodes),
+            "pending_approval": result.pending_approval, "error": result.error, "state": result.state,
+        }
+        if result.status == "failed":
+            raise GraphSchedulerError(result.error or f"Graph {graph.name!r} failed")
+        return summary
 
     async def _execute_task(self, payload: Mapping[str, Any]) -> Mapping[str, Any]:
         graph = self._get_graph(str(payload.get("graph_name", "")))
