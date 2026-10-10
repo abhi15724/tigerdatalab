@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import os
 import threading
 import time
@@ -68,6 +69,7 @@ def create_app(
     rate_window_seconds: int = 60,
     audit_log: Any | None = None,
     require_auth: bool | None = None,
+    audit_reader_key: str | None = None,
 ) -> Any:
     """Create a FastAPI app with authentication, rate limiting and audit hooks.
 
@@ -93,6 +95,12 @@ def create_app(
     if configured_key is not None and not configured_key.strip():
         raise DeploymentError("API key must not be empty or whitespace")
     auth_required = True if require_auth is None else require_auth
+    configured_audit_key = (
+        audit_reader_key if audit_reader_key is not None
+        else os.getenv("TIGERDATALAB_AUDIT_READER_KEY")
+    )
+    if configured_audit_key is not None and not configured_audit_key.strip():
+        raise DeploymentError("Audit reader key must not be empty or whitespace")
     if auth_required and not configured_key:
         raise DeploymentError(
             "Authentication is enabled by default; configure api_key or "
@@ -171,6 +179,19 @@ def create_app(
         if not isinstance(raw_options, Mapping):
             raise HTTPException(status_code=400, detail="options must be a JSON object")
         options = dict(raw_options)
+        # Do not let remote callers forward arbitrary provider/router kwargs.
+        # Router controls such as "strategy" mutate shared state and provider
+        # kwargs can bypass server-side cost/latency policy.
+        unknown_options = set(options) - {"top_k"}
+        if unknown_options:
+            raise HTTPException(
+                status_code=400,
+                detail=f"unsupported request options: {sorted(unknown_options)!r}",
+            )
+        if "top_k" in options:
+            top_k = options["top_k"]
+            if isinstance(top_k, bool) or not isinstance(top_k, int) or not 1 <= top_k <= 20:
+                raise HTTPException(status_code=400, detail="top_k must be an integer between 1 and 20")
         result = agent.ask(prompt, **options)
         audit.record(
             {
@@ -207,7 +228,14 @@ def create_app(
 
     @app.get("/v1/audit")
     def audit_events(request: Request) -> list[dict[str, Any]]:
+        # Audit data is more privileged than ordinary inference. A shared API
+        # key must not implicitly grant audit-reader access to every tenant.
         guard(request)
+        if not configured_audit_key:
+            raise HTTPException(status_code=404, detail="not found")
+        supplied = request.headers.get("x-audit-reader-key", "")
+        if not hmac.compare_digest(supplied, configured_audit_key):
+            raise HTTPException(status_code=403, detail="audit reader credentials required")
         if not hasattr(audit, "events"):
             raise HTTPException(status_code=501, detail="audit sink does not support reading events")
         return audit.events()

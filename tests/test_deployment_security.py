@@ -33,11 +33,11 @@ def test_auth_accepts_valid_key_and_audits_request():
     pytest.importorskip("fastapi")
     from fastapi.testclient import TestClient
 
-    client = TestClient(create_app(FakeAgent(), api_key="secret"))
+    client = TestClient(create_app(FakeAgent(), api_key="secret", audit_reader_key="audit-secret"))
     headers = {"Authorization": "Bearer secret"}
     response = client.post("/v1/ask", json={"prompt": "hi"}, headers=headers)
     assert response.status_code == 200
-    events = client.get("/v1/audit", headers=headers)
+    events = client.get("/v1/audit", headers={**headers, "X-Audit-Reader-Key": "audit-secret"})
     assert events.status_code == 200
     assert any(event["event"] == "agent_ask" for event in events.json())
 
