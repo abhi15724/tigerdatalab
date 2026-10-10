@@ -112,3 +112,18 @@ def test_audit_endpoint_requires_separate_reader_credential():
         "X-Audit-Reader-Key": "audit-reader-secret",
     })
     assert reader.status_code == 200
+
+def test_public_inference_rejects_unbounded_router_and_provider_options():
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    client = TestClient(create_app(ReadyAgent(), api_key="service-key"))
+    headers = {"Authorization": "Bearer service-key"}
+    for options in ({"strategy": "cost"}, {"max_tokens": 10}, {"top_k": True}, {"top_k": 1000}):
+        response = client.post("/v1/ask", headers=headers,
+                               json={"prompt": "synthetic", "options": options})
+        assert response.status_code == 400, (options, response.text)
+
+    allowed = client.post("/v1/ask", headers=headers,
+                          json={"prompt": "synthetic", "options": {"top_k": 3}})
+    assert allowed.status_code == 200
