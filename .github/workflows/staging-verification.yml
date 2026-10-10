@@ -1,0 +1,56 @@
+name: Staging verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      exercise_model:
+        description: "Send one synthetic inference request (may incur provider cost)"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tigerdatalab-staging-verification
+  cancel-in-progress: false
+
+jobs:
+  staging-smoke:
+    name: Verify configured staging deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Require staging configuration
+        env:
+          STAGING_URL: ${{ vars.TIGERDATALAB_STAGING_URL }}
+          STAGING_KEY: ${{ secrets.TIGERDATALAB_STAGING_API_KEY }}
+        run: |
+          python - <<'PY'
+          import os
+          from urllib.parse import urlparse
+          url = os.environ.get("STAGING_URL", "").strip()
+          key = os.environ.get("STAGING_KEY", "")
+          parsed = urlparse(url)
+          if parsed.scheme != "https" or not parsed.netloc:
+              raise SystemExit("Configure environment variable TIGERDATALAB_STAGING_URL as an HTTPS URL.")
+          if not key.strip():
+              raise SystemExit("Configure environment secret TIGERDATALAB_STAGING_API_KEY. Do not commit or print it.")
+          print("Staging URL and secret are configured; credential value is not displayed.")
+          PY
+      - name: Run non-destructive staging smoke checks
+        env:
+          TIGERDATALAB_STAGING_URL: ${{ vars.TIGERDATALAB_STAGING_URL }}
+          TIGERDATALAB_STAGING_API_KEY: ${{ secrets.TIGERDATALAB_STAGING_API_KEY }}
+        run: |
+          if [ "${{ inputs.exercise_model }}" = "true" ]; then
+            python scripts/staging_smoke.py --exercise-model
+          else
+            python scripts/staging_smoke.py
+          fi
