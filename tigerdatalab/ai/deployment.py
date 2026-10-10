@@ -179,6 +179,19 @@ def create_app(
         if not isinstance(raw_options, Mapping):
             raise HTTPException(status_code=400, detail="options must be a JSON object")
         options = dict(raw_options)
+        # Do not let remote callers forward arbitrary provider/router kwargs.
+        # Router controls such as "strategy" mutate shared state and provider
+        # kwargs can bypass server-side cost/latency policy.
+        unknown_options = set(options) - {"top_k"}
+        if unknown_options:
+            raise HTTPException(
+                status_code=400,
+                detail=f"unsupported request options: {sorted(unknown_options)!r}",
+            )
+        if "top_k" in options:
+            top_k = options["top_k"]
+            if isinstance(top_k, bool) or not isinstance(top_k, int) or not 1 <= top_k <= 20:
+                raise HTTPException(status_code=400, detail="top_k must be an integer between 1 and 20")
         result = agent.ask(prompt, **options)
         audit.record(
             {
