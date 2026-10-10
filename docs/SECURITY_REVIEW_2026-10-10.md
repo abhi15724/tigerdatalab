@@ -53,3 +53,11 @@
 4. Have an independent security reviewer validate the deployment and threat model.
 5. Close or explicitly accept all findings with owners and expiry dates.
 6. Approve a workload-specific release record; do not issue blanket certification.
+
+## Finding SEC-006 — Untrusted callers could override router/provider options
+
+- **Severity:** Medium; potentially High where provider options affect spending, model selection, or shared routing state.
+- **Component:** `tigerdatalab/ai/deployment.py`, `POST /v1/ask`.
+- **Evidence:** arbitrary JSON `options` were forwarded to `agent.ask`, which passes options to the model router/provider. This could expose router controls such as per-request strategy selection and provider parameters not intended for client control.
+- **Remediation in this branch:** the HTTP API accepts only `top_k` and bounds it to an integer from 1 through 20; arbitrary options are rejected with HTTP 400. Configure model/provider settings on the server side.
+- **Residual risk:** direct in-process calls to `CompanyAgent.ask` remain an application API and must be protected by the embedding application. Add narrowly scoped options only with explicit validation and concurrency tests.
