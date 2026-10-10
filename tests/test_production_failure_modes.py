@@ -94,3 +94,21 @@ def test_runtime_model_timeout_returns_failure_without_hanging():
     assert result.status == "failed"
     assert "timed out" in (result.error or "").lower()
     assert "secret" not in (result.error or "").lower()
+
+def test_audit_endpoint_requires_separate_reader_credential():
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    hidden = TestClient(create_app(ReadyAgent(), api_key="service-key"))
+    assert hidden.get("/v1/audit", headers={"Authorization": "Bearer service-key"}).status_code == 404
+
+    protected = TestClient(create_app(
+        ReadyAgent(), api_key="service-key", audit_reader_key="audit-reader-secret"
+    ))
+    service_only = protected.get("/v1/audit", headers={"Authorization": "Bearer service-key"})
+    assert service_only.status_code == 403
+    reader = protected.get("/v1/audit", headers={
+        "Authorization": "Bearer service-key",
+        "X-Audit-Reader-Key": "audit-reader-secret",
+    })
+    assert reader.status_code == 200
