@@ -30,6 +30,17 @@ def request(base: str, path: str, *, api_key: str | None = None, method: str = "
         return exc.code, exc.read().decode("utf-8", "replace")
 
 
+def response_detail(status: int, body: str, expected_status: int) -> str:
+    """Include a short, single-line response excerpt only when a check fails."""
+    detail = f"HTTP {status}"
+    if status != expected_status and body:
+        excerpt = " ".join(body.split())
+        if len(excerpt) > 500:
+            excerpt = excerpt[:497] + "..."
+        detail += f"; response={excerpt!r}"
+    return detail
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--exercise-model", action="store_true", help="send one synthetic prompt; may incur provider cost")
@@ -45,13 +56,15 @@ def main() -> int:
 
     checks = []
     for path in ("/health", "/ready"):
-        status, body = request(base, path)
+        status, _ = request(base, path)
         checks.append((f"GET {path}", status == 200, f"HTTP {status}"))
-    status, _ = request(base, "/v1/ask", method="POST", body={"prompt": "synthetic staging auth probe"})
-    checks.append(("unauthenticated POST /v1/ask", status == 401, f"HTTP {status}"))
-    status, _ = request(base, "/v1/ask", api_key="deliberately-wrong-key", method="POST",
-                        body={"prompt": "synthetic staging auth probe"})
-    checks.append(("invalid-key POST /v1/ask", status == 401, f"HTTP {status}"))
+
+    status, body = request(base, "/v1/ask", method="POST", body={"prompt": "synthetic staging auth probe"})
+    checks.append(("unauthenticated POST /v1/ask", status == 401, response_detail(status, body, 401)))
+
+    status, body = request(base, "/v1/ask", api_key="deliberately-wrong-key", method="POST",
+                           body={"prompt": "synthetic staging auth probe"})
+    checks.append(("invalid-key POST /v1/ask", status == 401, response_detail(status, body, 401)))
 
     if args.exercise_model:
         status, body = request(base, "/v1/ask", api_key=key, method="POST",
@@ -62,7 +75,7 @@ def main() -> int:
                 ok = "output" in json.loads(body)
             except (ValueError, TypeError):
                 ok = False
-        checks.append(("authenticated synthetic inference", ok, f"HTTP {status}"))
+        checks.append(("authenticated synthetic inference", ok, response_detail(status, body, 200)))
 
     for name, passed, detail in checks:
         print(f"{'PASS' if passed else 'FAIL'}  {name}: {detail}")
