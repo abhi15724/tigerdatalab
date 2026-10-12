@@ -1,7 +1,8 @@
 """Vercel staging entrypoint using the published TigerDataLab package.
 
 Configure GROQ_API_KEY and TIGERDATALAB_API_KEY in Vercel Project Settings.
-Never commit credentials. The model can be overridden with GROQ_MODEL.
+Never commit credentials. GROQ_MODEL is optional and falls back to a known
+configured default when unset or blank.
 """
 from __future__ import annotations
 
@@ -9,9 +10,9 @@ import os
 
 from tigerdatalab.ai import CompanyAgent, get_provider
 
-MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b").strip()
-if not MODEL:
-    raise RuntimeError("GROQ_MODEL must not be empty")
+# Empty environment variables must not disable the fallback. This avoids an
+# import-time failure when Vercel has a blank optional GROQ_MODEL setting.
+MODEL = os.getenv("GROQ_MODEL", "").strip() or "openai/gpt-oss-20b"
 
 try:
     timeout_seconds = float(os.getenv("GROQ_TIMEOUT_SECONDS", "35"))
