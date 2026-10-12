@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 import os
 import re
-from typing import Any
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -67,7 +66,6 @@ def _provider_failure(message: str) -> tuple[str, int, str]:
     return "provider_request_failed", 502, "The model provider request failed."
 
 
-@app.add_exception_handler(ProviderError)
 async def provider_error_handler(request: Request, exc: ProviderError) -> JSONResponse:
     # Do not log or return str(exc): provider errors may contain upstream bodies.
     code, status_code, safe_message = _provider_failure(str(exc))
@@ -83,7 +81,6 @@ async def provider_error_handler(request: Request, exc: ProviderError) -> JSONRe
     )
 
 
-@app.add_exception_handler(Exception)
 async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResponse:
     # Keep unexpected failures diagnosable without logging messages, prompts,
     # provider response bodies, authorization headers, or environment values.
@@ -101,3 +98,7 @@ async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResp
             }
         },
     )
+
+
+app.add_exception_handler(ProviderError, provider_error_handler)
+app.add_exception_handler(Exception, unexpected_error_handler)
